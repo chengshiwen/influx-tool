@@ -20,6 +20,7 @@ Usage:
 Available Commands:
   cleanup     Cleanup unused measurements
   help        Help about any command
+  transfer    Transfer influxdb persist data on disk from one or more to targets
 
 Flags:
   -h, --help      help for influx-tool
