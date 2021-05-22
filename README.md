@@ -9,7 +9,7 @@ influx-tool - Influx Tool for [InfluxDB](https://docs.influxdata.com/influxdb/v1
 
 ## Usage
 
-```bash
+```
 $ influx-tool --help
 
 influx tool for influxdb and influx-proxy
