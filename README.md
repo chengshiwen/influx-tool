@@ -19,6 +19,7 @@ Usage:
 
 Available Commands:
   cleanup     Cleanup measurements with regexp
+  compact     Compact the all shards fully
   help        Help about any command
   transfer    Transfer influxdb persist data on disk from one to another
 

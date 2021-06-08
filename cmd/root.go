@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/chengshiwen/influx-tool/cmd/cleanup"
+	"github.com/chengshiwen/influx-tool/cmd/compact"
 	"github.com/chengshiwen/influx-tool/cmd/transfer"
 	"github.com/spf13/cobra"
 )
@@ -40,8 +41,9 @@ func NewCommand() *cobra.Command {
 		Version:       version(),
 	}
 	cmd.SetVersionTemplate(`{{.Version}}`)
-	cmd.AddCommand(transfer.NewCommand())
 	cmd.AddCommand(cleanup.NewCommand())
+	cmd.AddCommand(compact.NewCommand())
+	cmd.AddCommand(transfer.NewCommand())
 	return cmd
 }
 
