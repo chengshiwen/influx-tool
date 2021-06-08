@@ -34,7 +34,7 @@ func NewCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Args:          cobra.NoArgs,
 		Use:           "transfer",
-		Short:         "transfer influxdb persist data on disk from one to another",
+		Short:         "Transfer influxdb persist data on disk from one to another",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(c *cobra.Command, args []string) error {

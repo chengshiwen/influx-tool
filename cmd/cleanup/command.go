@@ -33,7 +33,7 @@ func NewCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Args:          cobra.NoArgs,
 		Use:           "cleanup",
-		Short:         "cleanup measurements",
+		Short:         "Cleanup measurements with regexp",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(c *cobra.Command, args []string) error {

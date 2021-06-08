@@ -18,9 +18,9 @@ Usage:
   influx-tool [command]
 
 Available Commands:
-  cleanup     Cleanup unused measurements
+  cleanup     Cleanup measurements with regexp
   help        Help about any command
-  transfer    Transfer influxdb persist data on disk from one or more to targets
+  transfer    Transfer influxdb persist data on disk from one to another
 
 Flags:
   -h, --help      help for influx-tool
