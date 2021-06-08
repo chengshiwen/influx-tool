@@ -26,7 +26,7 @@ func init() {
 func Execute() {
 	cmd := NewCommand()
 	if err := cmd.Execute(); err != nil {
-		log.Fatalln(err)
+		log.Fatal(err)
 	}
 }
 
