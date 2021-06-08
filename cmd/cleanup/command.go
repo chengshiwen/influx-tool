@@ -151,14 +151,10 @@ func cleanup(flags *flagpole, c client.Client, measurements []string) {
 			query := strings.Join(queries, "; ")
 			wg.Add(1)
 			go func() {
-				if flags.worker > 0 {
-					limit <- struct{}{}
-				}
+				limit <- struct{}{}
 				defer func() {
 					wg.Done()
-					if flags.worker > 0 {
-						<-limit
-					}
+					<-limit
 				}()
 
 				q := client.NewQuery(query, flags.database, "")
