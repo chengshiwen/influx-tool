@@ -71,10 +71,10 @@ func newExporter(svr *server.Server, db, rp string, sd time.Duration, start, end
 func (e *exporter) SourceShardGroups() []meta.ShardGroupInfo { return e.sourceGroups }
 func (e *exporter) TargetShardGroups() []meta.ShardGroupInfo { return e.targetGroups }
 
-func (e *exporter) WriteTo(prChans map[int]chan *nio.PipeReader, nodeTotal, worker, sleepInterval int) {
+func (e *exporter) WriteTo(prChans map[int]chan *nio.PipeReader, nodeTotal int, hashKey string, worker, sleepInterval int) {
 	log.Printf("total shard groups: %d", len(e.targetGroups))
 	limit := make(chan struct{}, worker)
-	ch := hash.NewConsistentHash(nodeTotal)
+	ch := hash.NewConsistentHash(nodeTotal, hashKey)
 	wg := &sync.WaitGroup{}
 	for _, g := range e.targetGroups {
 		g := g

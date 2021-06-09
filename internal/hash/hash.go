@@ -17,13 +17,18 @@ type ConsistentHash struct {
 	cache      sync.Map
 }
 
-func NewConsistentHash(nodeTotal int) *ConsistentHash {
+func NewConsistentHash(nodeTotal int, hashKey string) *ConsistentHash {
 	ch := &ConsistentHash{
 		consistent: consistent.New(),
 	}
 	ch.consistent.NumberOfReplicas = 256
 	for idx := 0; idx < nodeTotal; idx++ {
 		str := strconv.Itoa(idx)
+		if hashKey == "exi" {
+			// exi: extended index, no hash collision will occur before idx <= 100000, which has been tested
+			// idx: default index, each additional backend causes 10% hash collision from 11th backend
+			str = "|" + str
+		}
 		ch.consistent.Add(str)
 	}
 	return ch

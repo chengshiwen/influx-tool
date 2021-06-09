@@ -29,6 +29,7 @@ type flagpole struct {
 	skipTsi         bool
 	nodeTotal       int
 	nodeIndex       intSet
+	hashKey         string
 	sleepInterval   int
 }
 
@@ -59,6 +60,7 @@ func NewCommand() *cobra.Command {
 	cmd.Flags().BoolVar(&flags.skipTsi, "skip-tsi", false, "skip building TSI index on disk (default: false)")
 	cmd.Flags().IntVarP(&flags.nodeTotal, "node-total", "n", 1, "total number of node in target circle")
 	cmd.Flags().VarP(&flags.nodeIndex, "node-index", "i", "index of node in target circle delimited by comma, [0, node-total) (default: all)")
+	cmd.Flags().StringVarP(&flags.hashKey, "hash-key", "k", "idx", "hash key for influx proxy, valid options are idx or edx")
 	cmd.Flags().IntVarP(&flags.sleepInterval, "sleep-interval", "p", 0, "sleep interval seconds per shard transfer, require worker > 0 (default: 0)")
 	cmd.MarkFlagRequired("source-dir")
 	cmd.MarkFlagRequired("target-dir")
@@ -105,6 +107,9 @@ func processFlags(flags *flagpole, start, end string) {
 			flags.nodeIndex[idx] = struct{}{}
 		}
 	}
+	if flags.hashKey != "idx" && flags.hashKey != "exi" {
+		log.Fatal("hash-key is invalid")
+	}
 	if flags.sleepInterval < 0 {
 		log.Fatal("sleep-interval is invalid")
 	}
@@ -150,7 +155,7 @@ func runE(flags *flagpole) (err error) {
 
 func transfer(flags *flagpole, exp *exporter, imps map[int]*importer) {
 	log.SetFlags(log.LstdFlags)
-	log.Printf("transfer node total: %d, node index: %s", flags.nodeTotal, flags.nodeIndex)
+	log.Printf("transfer node total: %d, node index: %s, hash key: %s", flags.nodeTotal, flags.nodeIndex, flags.hashKey)
 	start := time.Now().UTC()
 	defer func() {
 		elapsed := time.Since(start)
@@ -172,7 +177,7 @@ func transfer(flags *flagpole, exp *exporter, imps map[int]*importer) {
 				close(prChan)
 			}
 		}()
-		exp.WriteTo(prChans, flags.nodeTotal, flags.worker, flags.sleepInterval)
+		exp.WriteTo(prChans, flags.nodeTotal, flags.hashKey, flags.worker, flags.sleepInterval)
 	}()
 
 	wg := &sync.WaitGroup{}
