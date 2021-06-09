@@ -97,7 +97,6 @@ Flags:
   -n, --node-total int            total number of node in target circle (default 1)
   -i, --node-index intset         index of node in target circle delimited by comma, [0, node-total) (default: all)
   -k, --hash-key string           hash key for influx proxy, valid options are idx or edx (default "idx")
-  -p, --sleep-interval int        sleep interval seconds per shard transfer, require worker > 0 (default: 0)
   -h, --help                      help for transfer
 ```
 

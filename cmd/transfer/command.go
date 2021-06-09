@@ -30,7 +30,6 @@ type flagpole struct {
 	nodeTotal       int
 	nodeIndex       intSet
 	hashKey         string
-	sleepInterval   int
 }
 
 func NewCommand() *cobra.Command {
@@ -61,7 +60,6 @@ func NewCommand() *cobra.Command {
 	cmd.Flags().IntVarP(&flags.nodeTotal, "node-total", "n", 1, "total number of node in target circle")
 	cmd.Flags().VarP(&flags.nodeIndex, "node-index", "i", "index of node in target circle delimited by comma, [0, node-total) (default: all)")
 	cmd.Flags().StringVarP(&flags.hashKey, "hash-key", "k", "idx", "hash key for influx proxy, valid options are idx or edx")
-	cmd.Flags().IntVarP(&flags.sleepInterval, "sleep-interval", "p", 0, "sleep interval seconds per shard transfer, require worker > 0 (default: 0)")
 	cmd.MarkFlagRequired("source-dir")
 	cmd.MarkFlagRequired("target-dir")
 	cmd.MarkFlagRequired("database")
@@ -109,9 +107,6 @@ func processFlags(flags *flagpole, start, end string) {
 	}
 	if flags.hashKey != "idx" && flags.hashKey != "exi" {
 		log.Fatal("hash-key is invalid")
-	}
-	if flags.sleepInterval < 0 {
-		log.Fatal("sleep-interval is invalid")
 	}
 }
 
@@ -177,7 +172,7 @@ func transfer(flags *flagpole, exp *exporter, imps map[int]*importer) {
 				close(prChan)
 			}
 		}()
-		exp.WriteTo(prChans, flags.nodeTotal, flags.hashKey, flags.worker, flags.sleepInterval)
+		exp.WriteTo(prChans, flags.nodeTotal, flags.hashKey, flags.worker)
 	}()
 
 	wg := &sync.WaitGroup{}
