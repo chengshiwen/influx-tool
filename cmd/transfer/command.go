@@ -7,8 +7,12 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/chengshiwen/influx-tool/internal/binary"
+	"github.com/chengshiwen/influx-tool/internal/server"
+	"github.com/djherbis/nio/v3"
 	"github.com/spf13/cobra"
 )
 
@@ -107,9 +111,118 @@ func processFlags(flags *flagpole, start, end string) {
 }
 
 func runE(flags *flagpole) (err error) {
-	log.Printf("node-total: %d", flags.nodeTotal)
-	log.Printf("node-index: %s", flags.nodeIndex)
-	return nil
+	exportServer, err := server.NewServer(flags.sourceDir, !flags.skipTsi)
+	if err != nil {
+		return
+	}
+	defer exportServer.Close()
+	exp, err := newExporter(exportServer, flags.database, flags.retentionPolicy, flags.shardDuration, flags.startTime, flags.endTime)
+	if err != nil {
+		return
+	}
+
+	svrs := make(map[int]*server.Server)
+	imps := make(map[int]*importer)
+	defer func() {
+		for _, imp := range imps {
+			imp.Close()
+		}
+		for _, svr := range svrs {
+			svr.Close()
+		}
+	}()
+	for idx := range flags.nodeIndex {
+		importServer, err := server.NewServer(fmt.Sprintf("%s-%d", flags.targetDir, idx), !flags.skipTsi)
+		if err != nil {
+			return err
+		}
+		svrs[idx] = importServer
+		imp, err := newImporter(importServer, flags.database, flags.retentionPolicy, flags.shardDuration, flags.duration, !flags.skipTsi)
+		if err != nil {
+			return err
+		}
+		imps[idx] = imp
+	}
+
+	transfer(flags, exp, imps)
+	return
+}
+
+func transfer(flags *flagpole, exp *exporter, imps map[int]*importer) {
+	log.SetFlags(log.LstdFlags)
+	log.Printf("transfer node total: %d, node index: %s", flags.nodeTotal, flags.nodeIndex)
+	start := time.Now().UTC()
+	defer func() {
+		elapsed := time.Since(start)
+		if elapsed.Minutes() > 10 {
+			log.Printf("total time: %0.1f minutes", elapsed.Minutes())
+		} else {
+			log.Printf("total time: %0.1f seconds", elapsed.Seconds())
+		}
+	}()
+
+	prChans := make(map[int]chan *nio.PipeReader)
+	for idx := range flags.nodeIndex {
+		prChans[idx] = make(chan *nio.PipeReader, 4)
+	}
+
+	go func() {
+		defer func() {
+			for _, prChan := range prChans {
+				close(prChan)
+			}
+		}()
+		exp.WriteTo(prChans, flags.nodeTotal, flags.worker, flags.sleepInterval)
+	}()
+
+	wg := &sync.WaitGroup{}
+	for idx := range imps {
+		wg.Add(1)
+		idx := idx
+		go func() {
+			defer wg.Done()
+			transferNode(imps[idx], prChans[idx], idx)
+		}()
+	}
+	wg.Wait()
+	log.Print("transfer done")
+}
+
+func transferNode(imp *importer, prChan chan *nio.PipeReader, idx int) {
+	log.Printf("node index %d transfer start", idx)
+	wg := &sync.WaitGroup{}
+	for pr := range prChan {
+		wg.Add(1)
+		pr := pr
+		go func() {
+			defer wg.Done()
+			defer pr.Close()
+
+			iw := newImportWorker(imp)
+
+			reader := binary.NewReader(pr)
+			_, err := reader.ReadHeader()
+			if err != nil {
+				log.Printf("read header error: %s", err)
+				return
+			}
+
+			var bh *binary.BucketHeader
+			for bh, err = reader.NextBucket(); (bh != nil) && (err == nil); bh, err = reader.NextBucket() {
+				err = iw.ImportShard(reader, bh.Start, bh.End)
+				if err != nil {
+					log.Printf("import shard error: %s, idx: %d", err, idx)
+					return
+				}
+			}
+			if err != nil {
+				log.Printf("next bucket error: %s", err)
+				return
+			}
+		}()
+	}
+	wg.Wait()
+	log.Printf("node index %d transfer done", idx)
 }
 
 type intSet map[int]struct{}

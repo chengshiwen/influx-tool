@@ -120,7 +120,6 @@ func runE(flags *flagpole) (err error) {
 	}
 	wg.Wait()
 	log.Print("compaction shard done")
-
 	return
 }
 

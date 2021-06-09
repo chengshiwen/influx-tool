@@ -3,6 +3,8 @@ module github.com/chengshiwen/influx-tool
 go 1.14
 
 require (
+	github.com/djherbis/buffer v1.2.0
+	github.com/djherbis/nio/v3 v3.0.1
 	github.com/gogo/protobuf v1.3.1
 	github.com/google/go-cmp v0.4.0
 	github.com/influxdata/influxdb v1.8.6
