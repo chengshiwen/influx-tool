@@ -33,7 +33,7 @@ Use "influx-tool [command] --help" for more information about a command
 ### Cleanup
 
 ```
-influx-tool cleanup --help
+$ influx-tool cleanup --help
 
 Cleanup measurements with regexp
 
@@ -49,10 +49,10 @@ Flags:
   -s, --ssl               use https for requests
   -r, --regexp string     regular expression of measurements to clean (default "", all)
   -m, --max-limit int     max limit to show measurements (default 0, no limit)
-  -S, --show-num int      measurement number to show when show measurements (default 5)
-  -D, --drop-num int      measurement number to drop per worker (default 10)
+  -S, --show-num int      measurement number to show when show measurements (default 10)
+  -D, --drop-num int      measurement number to drop per worker (default 1)
   -w, --worker int        number of concurrent workers to cleanup (default 10)
-  -n, --progress int      print progress after every <n> measurements cleanup (default 100)
+  -n, --progress int      print progress after every <n> measurements cleanup (default 10)
   -C, --cleanup           confirm cleanup the measurements (be cautious before doing it)
   -h, --help              help for cleanup
 ```
@@ -60,7 +60,8 @@ Flags:
 ### Compact
 
 ```
-influx-tool compact --help
+$ influx-tool compact --help
+
 Compact the all shards fully
 
 Usage:
@@ -96,7 +97,7 @@ Flags:
       --skip-tsi                  skip building TSI index on disk (default: false)
   -n, --node-total int            total number of node in target circle (default 1)
   -i, --node-index intset         index of node in target circle delimited by comma, [0, node-total) (default: all)
-  -k, --hash-key string           hash key for influx proxy, valid options are idx or edx (default "idx")
+  -k, --hash-key string           hash key for influx proxy, valid options are idx or exi (default "idx")
   -h, --help                      help for transfer
 ```
 
