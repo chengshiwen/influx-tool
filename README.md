@@ -104,6 +104,8 @@ Flags:
 If you are using [Influx Proxy](https://github.com/chengshiwen/influx-proxy) v2.4.7+, and you need to transfer InfluxDB data, such as scaling, rebalancing and recovering.
 This command is high-performance and doesn't need to start InfluxDB, and it's a direct transformation of disk data.
 
+![image](https://raw.githubusercontent.com/wiki/chengshiwen/influx-tool/image/influx-tool-transfer.png)
+
 If the original Influx Proxy cluster has 3 InfluxDB instances, corresponding to the following 3 data persistence directories
 (the following directories are for reference only, and the actual directories shall prevail):
 
