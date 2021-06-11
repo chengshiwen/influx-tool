@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/chengshiwen/influx-tool/internal/binary"
+	"github.com/chengshiwen/influx-tool/internal/escape"
 	"github.com/chengshiwen/influx-tool/internal/hash"
 	"github.com/chengshiwen/influx-tool/internal/server"
 	"github.com/chengshiwen/influx-tool/internal/storage"
@@ -137,6 +138,10 @@ func (e *exporter) writeBucket(prChans map[int]chan *nio.PipeReader, rs *storage
 	}()
 
 	for rs.Next() {
+		if escape.NeedEscape(rs.Name(), rs.Tags()) {
+			log.Printf("discard escaped measurement: %s, tags: %s", rs.Name(), rs.Tags())
+			continue
+		}
 		nodeIndex := h.Get(hash.GetKey(e.db, rs.Name()))
 		if prChan, pok := prChans[nodeIndex]; pok {
 			if _, bok := bws[nodeIndex]; !bok {

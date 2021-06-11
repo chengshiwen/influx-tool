@@ -2,6 +2,7 @@ package shard
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -86,6 +87,12 @@ func NewWriter(id uint64, path string, opts ...WriterOption) *Writer {
 }
 
 func (w *Writer) Write(key []byte, values tsm1.Values) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("shard write panic: %v", r)
+		}
+	}()
+
 	if w.err != nil {
 		return
 	}
