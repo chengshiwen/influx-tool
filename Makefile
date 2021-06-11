@@ -6,7 +6,7 @@ GOBUILD_ENV = GO111MODULE=on CGO_ENABLED=0
 GOBUILD     = go build -o bin/influx-tool -a -ldflags $(LDFLAGS)
 GOX         = go run github.com/mitchellh/gox
 TARGETS     := darwin/amd64 linux/amd64 windows/amd64
-DIST_DIRS   := find * -type d -maxdepth 0 -exec
+DIST_DIRS   := find * -maxdepth 0 -type d -exec
 
 .PHONY: build linux cross-build release test lint down tidy clean
 
