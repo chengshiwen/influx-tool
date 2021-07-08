@@ -10,6 +10,7 @@ import (
 	"github.com/chengshiwen/influx-tool/cmd/cleanup"
 	"github.com/chengshiwen/influx-tool/cmd/compact"
 	exporter "github.com/chengshiwen/influx-tool/cmd/export"
+	importer "github.com/chengshiwen/influx-tool/cmd/import"
 	"github.com/chengshiwen/influx-tool/cmd/transfer"
 	"github.com/spf13/cobra"
 )
@@ -45,6 +46,7 @@ func NewCommand() *cobra.Command {
 	cmd.AddCommand(cleanup.NewCommand())
 	cmd.AddCommand(compact.NewCommand())
 	cmd.AddCommand(exporter.NewCommand())
+	cmd.AddCommand(importer.NewCommand())
 	cmd.AddCommand(transfer.NewCommand())
 	return cmd
 }
