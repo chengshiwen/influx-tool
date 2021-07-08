@@ -102,8 +102,12 @@ func (c *indexSeriesCursor) Next() *seriesRow {
 
 		c.row.name = sr.Name
 		c.row.tags = sr.Tags
-
 		c.nf = c.fields[string(sr.Name)]
+
+		if len(c.nf) == 0 {
+			c.Close()
+			return nil
+		}
 	}
 
 	c.row.field, c.nf = c.nf[0], c.nf[1:]
