@@ -10,6 +10,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -24,15 +25,17 @@ import (
 )
 
 type flagpole struct {
-	dataDir         string
-	walDir          string
-	out             string
-	database        string
-	retentionPolicy string
-	startTime       int64
-	endTime         int64
-	compress        bool
-	lponly          bool
+	dataDir           string
+	walDir            string
+	out               string
+	database          string
+	retentionPolicy   string
+	measurement       map[string]struct{}
+	regexpMeasurement []*regexp.Regexp
+	startTime         int64
+	endTime           int64
+	compress          bool
+	lponly            bool
 }
 
 var (
@@ -45,7 +48,11 @@ const stdoutMark = "-"
 
 func NewCommand() *cobra.Command {
 	var start, end string
-	flags := &flagpole{}
+	var measurement, regexpMeasurement []string
+	flags := &flagpole{
+		measurement:       make(map[string]struct{}),
+		regexpMeasurement: make([]*regexp.Regexp, 0),
+	}
 	cmd := &cobra.Command{
 		Args:          cobra.NoArgs,
 		Use:           "export",
@@ -53,7 +60,7 @@ func NewCommand() *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(c *cobra.Command, args []string) error {
-			processFlags(flags, start, end)
+			processFlags(flags, start, end, measurement, regexpMeasurement)
 			return runE(flags)
 		},
 	}
@@ -61,8 +68,10 @@ func NewCommand() *cobra.Command {
 	cmd.Flags().StringVarP(&flags.dataDir, "datadir", "D", "", "data storage path (required)")
 	cmd.Flags().StringVarP(&flags.walDir, "waldir", "W", "", "wal storage path (required)")
 	cmd.Flags().StringVarP(&flags.out, "out", "o", "./export", "'-' for standard out or the destination file to export to")
-	cmd.Flags().StringVarP(&flags.database, "database", "d", "", "database to export")
+	cmd.Flags().StringVarP(&flags.database, "database", "d", "", "database to export without _internal (default: all)")
 	cmd.Flags().StringVarP(&flags.retentionPolicy, "retention-policy", "r", "", "retention policy to export (require -database)")
+	cmd.Flags().StringArrayVarP(&measurement, "measurement", "m", []string{}, "measurement to export, can be set multiple times (require -database, default: all)")
+	cmd.Flags().StringArrayVarP(&regexpMeasurement, "regexp-measurement", "M", []string{}, "regexp measurement to export, can be set multiple times (require -database, default: all)")
 	cmd.Flags().StringVarP(&start, "start", "S", "", "start time to export (RFC3339 format, optional)")
 	cmd.Flags().StringVarP(&end, "end", "E", "", "end time to export (RFC3339 format, optional)")
 	cmd.Flags().BoolVarP(&flags.lponly, "lponly", "l", false, "only export line protocol (default: false)")
@@ -76,7 +85,38 @@ func (flags *flagpole) usingStdOut() bool {
 	return flags.out == stdoutMark
 }
 
-func processFlags(flags *flagpole, start, end string) {
+func (flags *flagpole) matchMeasurement(m string) bool {
+	if len(flags.measurement) == 0 && len(flags.regexpMeasurement) == 0 {
+		return true
+	}
+	if len(flags.measurement) > 0 {
+		if _, ok := flags.measurement[m]; ok {
+			return true
+		}
+	}
+	if len(flags.regexpMeasurement) > 0 {
+		for _, rem := range flags.regexpMeasurement {
+			if rem.MatchString(m) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (flags *flagpole) withMeasurement() string {
+	if len(flags.measurement) > 0 && len(flags.regexpMeasurement) > 0 {
+		return fmt.Sprintf(" with %d measurements and %d regexp measurements", len(flags.measurement), len(flags.regexpMeasurement))
+	} else if len(flags.measurement) > 0 {
+		return fmt.Sprintf(" with %d measurements", len(flags.measurement))
+	} else if len(flags.regexpMeasurement) > 0 {
+		return fmt.Sprintf(" with %d regexp measurements", len(flags.regexpMeasurement))
+	} else {
+		return ""
+	}
+}
+
+func processFlags(flags *flagpole, start, end string, measurement, regexpMeasurement []string) {
 	if start != "" {
 		s, err := time.Parse(time.RFC3339, start)
 		if err != nil {
@@ -102,7 +142,23 @@ func processFlags(flags *flagpole, start, end string) {
 		log.Fatal("database cannot be _internal")
 	}
 	if flags.retentionPolicy != "" && flags.database == "" {
-		log.Fatal("must specify a database")
+		log.Fatal("must specify a database when retention policy given")
+	}
+	if len(flags.measurement) > 0 && flags.database == "" {
+		log.Fatal("must specify a database when measurement given")
+	}
+	for _, str := range measurement {
+		flags.measurement[str] = struct{}{}
+	}
+	if len(flags.regexpMeasurement) > 0 && flags.database == "" {
+		log.Fatal("must specify a database when regexp measurement given")
+	}
+	for _, str := range regexpMeasurement {
+		if rem, err := regexp.Compile(str); err == nil {
+			flags.regexpMeasurement = append(flags.regexpMeasurement, rem)
+		} else {
+			log.Fatalf("regexp measurement: %s, compile error: %v", str, err)
+		}
 	}
 }
 
@@ -203,14 +259,14 @@ func writeDML(flags *flagpole, mw io.Writer, w io.Writer) error {
 		fmt.Fprintf(mw, "# CONTEXT-DATABASE:%s\n", keys[0])
 		fmt.Fprintf(mw, "# CONTEXT-RETENTION-POLICY:%s\n", keys[1])
 		if files, ok := tsmFiles[key]; ok {
-			fmt.Fprintf(msgOut, "writing out tsm file data for %s...", key)
+			fmt.Fprintf(msgOut, "writing out tsm file data for %s%s...", key, flags.withMeasurement())
 			if err := writeTsmFiles(flags, mw, w, files); err != nil {
 				return err
 			}
 			fmt.Fprintln(msgOut, "complete.")
 		}
 		if _, ok := walFiles[key]; ok {
-			fmt.Fprintf(msgOut, "writing out wal file data for %s...", key)
+			fmt.Fprintf(msgOut, "writing out wal file data for %s%s...", key, flags.withMeasurement())
 			if err := writeWALFiles(flags, mw, w, walFiles[key], key); err != nil {
 				return err
 			}
@@ -333,10 +389,14 @@ func exportTSMFile(flags *flagpole, tsmFilePath string, w io.Writer) error {
 			fmt.Fprintf(os.Stderr, "unable to read key %q in %s, skipping: %s\n", string(key), tsmFilePath, err.Error())
 			continue
 		}
-		measurement, field := tsm1.SeriesAndFieldFromCompositeKey(key)
+		seriesKey, field := tsm1.SeriesAndFieldFromCompositeKey(key)
+		name := models.ParseName(seriesKey)
+		if !flags.matchMeasurement(string(name)) {
+			continue
+		}
+		// seriesKey are stored escaped, field names are not
 		field = escape.Bytes(field)
-
-		if err := writeValues(flags, w, measurement, string(field), values); err != nil {
+		if err := writeValues(flags, w, seriesKey, string(field), values); err != nil {
 			// An error from writeValues indicates an IO error, which should be returned.
 			return err
 		}
@@ -400,11 +460,14 @@ func exportWALFile(flags *flagpole, walFilePath string, w io.Writer, warnDelete 
 			continue
 		case *tsm1.WriteWALEntry:
 			for key, values := range t.Values {
-				measurement, field := tsm1.SeriesAndFieldFromCompositeKey([]byte(key))
-				// measurements are stored escaped, field names are not
+				seriesKey, field := tsm1.SeriesAndFieldFromCompositeKey([]byte(key))
+				name := models.ParseName(seriesKey)
+				if !flags.matchMeasurement(string(name)) {
+					continue
+				}
+				// seriesKey are stored escaped, field names are not
 				field = escape.Bytes(field)
-
-				if err := writeValues(flags, w, measurement, string(field), values); err != nil {
+				if err := writeValues(flags, w, seriesKey, string(field), values); err != nil {
 					// An error from writeValues indicates an IO error, which should be returned.
 					return err
 				}
