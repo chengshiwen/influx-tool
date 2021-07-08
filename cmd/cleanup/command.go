@@ -47,14 +47,14 @@ func NewCommand() *cobra.Command {
 	cmd.Flags().StringVarP(&flags.database, "database", "d", "", "database to connect to the server (required)")
 	cmd.Flags().StringVarP(&flags.username, "username", "u", "", "username to connect to the server")
 	cmd.Flags().StringVarP(&flags.password, "password", "p", "", "password to connect to the server")
-	cmd.Flags().BoolVarP(&flags.ssl, "ssl", "s", false, "use https for requests")
+	cmd.Flags().BoolVarP(&flags.ssl, "ssl", "s", false, "use https for requests (default: false)")
 	cmd.Flags().StringVarP(&flags.regexp, "regexp", "r", "", "regular expression of measurements to clean (default \"\", all)")
 	cmd.Flags().IntVarP(&flags.maxLimit, "max-limit", "m", 0, "max limit to show measurements (default 0, no limit)")
 	cmd.Flags().IntVarP(&flags.showNum, "show-num", "S", 10, "measurement number to show when show measurements")
 	cmd.Flags().IntVarP(&flags.dropNum, "drop-num", "D", 1, "measurement number to drop per worker")
 	cmd.Flags().IntVarP(&flags.worker, "worker", "w", 10, "number of concurrent workers to cleanup")
 	cmd.Flags().IntVarP(&flags.progress, "progress", "n", 10, "print progress after every <n> measurements cleanup")
-	cmd.Flags().BoolVarP(&flags.cleanup, "cleanup", "C", false, "confirm cleanup the measurements (be cautious before doing it)")
+	cmd.Flags().BoolVarP(&flags.cleanup, "cleanup", "C", false, "confirm cleanup the measurements (be cautious before doing it, default: false)")
 	cmd.MarkFlagRequired("database")
 	return cmd
 }

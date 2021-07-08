@@ -56,7 +56,7 @@ func NewCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Args:          cobra.NoArgs,
 		Use:           "export",
-		Short:         "Export TSM files into InfluxDB line protocol format",
+		Short:         "Export tsm files into InfluxDB line protocol format",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(c *cobra.Command, args []string) error {
