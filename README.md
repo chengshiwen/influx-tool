@@ -20,7 +20,9 @@ Usage:
 Available Commands:
   cleanup     Cleanup measurements with regexp
   compact     Compact the all shards fully
+  export      Export tsm files into InfluxDB line protocol format
   help        Help about any command
+  import      Import a previous export from file
   transfer    Transfer influxdb persist data on disk from one to another
 
 Flags:
@@ -46,14 +48,14 @@ Flags:
   -d, --database string   database to connect to the server (required)
   -u, --username string   username to connect to the server
   -p, --password string   password to connect to the server
-  -s, --ssl               use https for requests
+  -s, --ssl               use https for requests (default: false)
   -r, --regexp string     regular expression of measurements to clean (default "", all)
   -m, --max-limit int     max limit to show measurements (default 0, no limit)
   -S, --show-num int      measurement number to show when show measurements (default 10)
   -D, --drop-num int      measurement number to drop per worker (default 1)
   -w, --worker int        number of concurrent workers to cleanup (default 10)
   -n, --progress int      print progress after every <n> measurements cleanup (default 10)
-  -C, --cleanup           confirm cleanup the measurements (be cautious before doing it)
+  -C, --cleanup           confirm cleanup the measurements (be cautious before doing it, default: false)
   -h, --help              help for cleanup
 ```
 
@@ -72,6 +74,53 @@ Flags:
   -f, --force         force compaction without prompting (default: false)
   -w, --worker int    number of concurrent workers to compact (default: 0, unlimited)
   -h, --help          help for compact
+```
+
+### Export
+
+```
+$ influx-tool export --help
+
+Export tsm files into InfluxDB line protocol format
+
+Usage:
+  influx-tool export [flags]
+
+Flags:
+  -D, --datadir string                   data storage path (required)
+  -W, --waldir string                    wal storage path (required)
+  -o, --out string                       '-' for standard out or the destination file to export to (default "./export")
+  -d, --database string                  database to export without _internal (default: all)
+  -r, --retention-policy string          retention policy to export (require -database)
+  -m, --measurement stringArray          measurement to export, can be set multiple times (require -database, default: all)
+  -M, --regexp-measurement stringArray   regexp measurement to export, can be set multiple times (require -database, default: all)
+  -S, --start string                     start time to export (RFC3339 format, optional)
+  -E, --end string                       end time to export (RFC3339 format, optional)
+  -l, --lponly                           only export line protocol (default: false)
+  -c, --compress                         compress the output (default: false)
+  -h, --help                             help for export
+```
+
+### Import
+
+```
+$ influx-tool import --help
+
+Import a previous export from file
+
+Usage:
+  influx-tool import [flags]
+
+Flags:
+  -H, --host string       host to connect to (default "127.0.0.1")
+  -P, --port int          port to connect to (default 8086)
+  -u, --username string   username to connect to the server
+  -p, --password string   password to connect to the server
+  -s, --ssl               use https for requests (default: false)
+  -f, --path string       path to the file to import (required)
+  -c, --compressed        set to true if the import file is compressed (default: false)
+      --pps int           points per second the import will allow (default: 0, unlimited)
+  -h, --help              help for import
 ```
 
 ### Transfer
