@@ -1,6 +1,7 @@
 package cleanup
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"strings"
@@ -60,26 +61,29 @@ func NewCommand() *cobra.Command {
 	return cmd.cobraCmd
 }
 
-func (cmd *command) validate() {
+func (cmd *command) validate() error {
 	if cmd.maxLimit < 0 {
-		log.Fatal("max-limit is invalid")
+		return errors.New("max-limit is invalid")
 	}
 	if cmd.showNum <= 0 {
-		log.Fatal("show-num is invalid")
+		return errors.New("show-num is invalid")
 	}
 	if cmd.dropNum <= 0 {
-		log.Fatal("drop-num is invalid")
+		return errors.New("drop-num is invalid")
 	}
 	if cmd.worker <= 0 {
-		log.Fatal("worker is invalid")
+		return errors.New("worker is invalid")
 	}
 	if cmd.progress <= 0 {
-		log.Fatal("progress is invalid")
+		return errors.New("progress is invalid")
 	}
+	return nil
 }
 
-func (cmd *command) runE() (err error) {
-	cmd.validate()
+func (cmd *command) runE() error {
+	if err := cmd.validate(); err != nil {
+		return err
+	}
 
 	addr := fmt.Sprintf("http://%s:%d", cmd.host, cmd.port)
 	if cmd.ssl {
@@ -93,7 +97,7 @@ func (cmd *command) runE() (err error) {
 	})
 	if err != nil {
 		log.Printf("creating influxdb client error: %v", err)
-		return
+		return err
 	}
 	defer c.Close()
 
@@ -126,11 +130,11 @@ func (cmd *command) runE() (err error) {
 		log.Printf("measurements: %v (total %d)", strings.Join(measurements, " "), len(measurements))
 	} else {
 		log.Print("measurements: empty (total 0)")
-		return
+		return nil
 	}
 
 	cmd.dropMeasurements(c, measurements)
-	return
+	return nil
 }
 
 func (cmd *command) dropMeasurements(c client.Client, measurements []string) {

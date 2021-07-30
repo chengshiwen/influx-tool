@@ -48,18 +48,20 @@ func NewCommand() *cobra.Command {
 	return cmd.cobraCmd
 }
 
-func (cmd *command) validate() {
+func (cmd *command) validate() error {
 	if cmd.worker < 0 {
-		log.Fatal("worker is invalid")
+		return errors.New("worker is invalid")
 	}
+	return nil
 }
 
-func (cmd *command) runE() (err error) {
-	cmd.validate()
-
+func (cmd *command) runE() error {
+	if err := cmd.validate(); err != nil {
+		return err
+	}
 	files, err := ioutil.ReadDir(cmd.path)
 	if err != nil {
-		return
+		return err
 	}
 	reg := regexp.MustCompile(`\d+`)
 	paths := make([]string, 0)
@@ -82,7 +84,7 @@ func (cmd *command) runE() (err error) {
 		}
 
 		if strings.ToLower(scan.Text()) != "y" {
-			return
+			return nil
 		}
 	}
 
@@ -123,7 +125,7 @@ func (cmd *command) runE() (err error) {
 	}
 	wg.Wait()
 	log.Print("compaction shard done")
-	return
+	return nil
 }
 
 type shardCompactor struct {

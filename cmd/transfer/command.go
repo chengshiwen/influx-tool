@@ -1,6 +1,7 @@
 package transfer
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"math"
@@ -67,11 +68,11 @@ func NewCommand() *cobra.Command {
 	return cmd.cobraCmd
 }
 
-func (cmd *command) validate(start, end string) {
+func (cmd *command) validate(start, end string) error {
 	if start != "" {
 		s, err := time.Parse(time.RFC3339, start)
 		if err != nil {
-			log.Fatal("start time is invalid")
+			return errors.New("start time is invalid")
 		}
 		cmd.startTime = s.UnixNano()
 	} else {
@@ -80,25 +81,25 @@ func (cmd *command) validate(start, end string) {
 	if end != "" {
 		e, err := time.Parse(time.RFC3339, end)
 		if err != nil {
-			log.Fatal("end time is invalid")
+			return errors.New("end time is invalid")
 		}
 		cmd.endTime = e.UnixNano()
 	} else {
 		cmd.endTime = math.MaxInt64
 	}
 	if cmd.startTime != 0 && cmd.endTime != 0 && cmd.endTime < cmd.startTime {
-		log.Fatal("end time before start time")
+		return errors.New("end time before start time")
 	}
 
 	if cmd.worker < 0 {
-		log.Fatal("worker is invalid")
+		return errors.New("worker is invalid")
 	}
 	if cmd.nodeTotal <= 0 {
-		log.Fatal("node-total is invalid")
+		return errors.New("node-total is invalid")
 	}
 	for idx := range cmd.nodeIndex {
 		if idx < 0 || idx >= cmd.nodeTotal {
-			log.Fatal("node-index is invalid")
+			return errors.New("node-index is invalid")
 		}
 	}
 	if len(cmd.nodeIndex) == 0 {
@@ -107,21 +108,23 @@ func (cmd *command) validate(start, end string) {
 		}
 	}
 	if cmd.hashKey != "idx" && cmd.hashKey != "exi" {
-		log.Fatal("hash-key is invalid")
+		return errors.New("hash-key is invalid")
 	}
+	return nil
 }
 
-func (cmd *command) runE(start, end string) (err error) {
-	cmd.validate(start, end)
-
+func (cmd *command) runE(start, end string) error {
+	if err := cmd.validate(start, end); err != nil {
+		return err
+	}
 	exportServer, err := server.NewServer(cmd.sourceDir, !cmd.skipTsi)
 	if err != nil {
-		return
+		return err
 	}
 	defer exportServer.Close()
 	exp, err := newExporter(exportServer, cmd.database, cmd.retentionPolicy, cmd.shardDuration, cmd.startTime, cmd.endTime)
 	if err != nil {
-		return
+		return err
 	}
 
 	svrs := make(map[int]*server.Server)
@@ -148,7 +151,7 @@ func (cmd *command) runE(start, end string) (err error) {
 	}
 
 	cmd.transfer(exp, imps)
-	return
+	return nil
 }
 
 func (cmd *command) transfer(exp *exporter, imps map[int]*importer) {

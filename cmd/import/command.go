@@ -2,7 +2,6 @@ package importer
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/influxdata/influxdb/client"
 	v8 "github.com/influxdata/influxdb/importer/v8"
@@ -44,18 +43,21 @@ func NewCommand() *cobra.Command {
 	return cmd.cobraCmd
 }
 
-func (cmd *command) validate() {
+func (cmd *command) validate() error {
 	addr := fmt.Sprintf("%s:%d", cmd.host, cmd.port)
 	url, err := client.ParseConnectionString(addr, cmd.ssl)
 	if err != nil {
-		log.Fatalf("parse url error: %s", err)
+		return fmt.Errorf("parse url error: %s", err)
 	}
 	cmd.clientConfig.URL = url
 	cmd.clientConfig.UnsafeSsl = cmd.ssl
+	return nil
 }
 
 func (cmd *command) runE() error {
-	cmd.validate()
+	if err := cmd.validate(); err != nil {
+		return err
+	}
 	config := cmd.config
 	config.Config = cmd.clientConfig
 	i := v8.NewImporter(config)

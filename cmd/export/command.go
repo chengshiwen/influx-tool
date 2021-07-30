@@ -3,10 +3,10 @@ package exporter
 import (
 	"bufio"
 	"compress/gzip"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"math"
 	"os"
 	"path/filepath"
@@ -83,11 +83,11 @@ func NewCommand() *cobra.Command {
 	return cmd.cobraCmd
 }
 
-func (cmd *command) validate(start, end string, measurement, regexpMeasurement []string) {
+func (cmd *command) validate(start, end string, measurement, regexpMeasurement []string) error {
 	if start != "" {
 		s, err := time.Parse(time.RFC3339, start)
 		if err != nil {
-			log.Fatal("start time is invalid")
+			return errors.New("start time is invalid")
 		}
 		cmd.startTime = s.UnixNano()
 	} else {
@@ -96,41 +96,44 @@ func (cmd *command) validate(start, end string, measurement, regexpMeasurement [
 	if end != "" {
 		e, err := time.Parse(time.RFC3339, end)
 		if err != nil {
-			log.Fatal("end time is invalid")
+			return errors.New("end time is invalid")
 		}
 		cmd.endTime = e.UnixNano()
 	} else {
 		cmd.endTime = math.MaxInt64
 	}
 	if cmd.startTime != 0 && cmd.endTime != 0 && cmd.endTime < cmd.startTime {
-		log.Fatal("end time before start time")
+		return errors.New("end time before start time")
 	}
 	if cmd.database == "_internal" {
-		log.Fatal("database cannot be _internal")
+		return errors.New("database cannot be _internal")
 	}
 	if cmd.retentionPolicy != "" && cmd.database == "" {
-		log.Fatal("must specify a database when retention policy given")
+		return errors.New("must specify a database when retention policy given")
 	}
 	if len(cmd.measurement) > 0 && cmd.database == "" {
-		log.Fatal("must specify a database when measurement given")
+		return errors.New("must specify a database when measurement given")
 	}
 	for _, str := range measurement {
 		cmd.measurement[str] = struct{}{}
 	}
 	if len(cmd.regexpMeasurement) > 0 && cmd.database == "" {
-		log.Fatal("must specify a database when regexp measurement given")
+		return errors.New("must specify a database when regexp measurement given")
 	}
 	for _, str := range regexpMeasurement {
 		if rem, err := regexp.Compile(str); err == nil {
 			cmd.regexpMeasurement = append(cmd.regexpMeasurement, rem)
 		} else {
-			log.Fatalf("regexp measurement: %s, compile error: %v", str, err)
+			return fmt.Errorf("regexp measurement: %s, compile error: %v", str, err)
 		}
 	}
+	return nil
 }
 
 func (cmd *command) runE(start, end string, measurement, regexpMeasurement []string) error {
-	cmd.validate(start, end, measurement, regexpMeasurement)
+	if err := cmd.validate(start, end, measurement, regexpMeasurement); err != nil {
+		return err
+	}
 	if err := cmd.walkTSMFiles(); err != nil {
 		return err
 	}
