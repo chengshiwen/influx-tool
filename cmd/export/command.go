@@ -24,7 +24,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type flagpole struct {
+type command struct {
+	cobraCmd          *cobra.Command
 	dataDir           string
 	walDir            string
 	out               string
@@ -49,53 +50,53 @@ const stdoutMark = "-"
 func NewCommand() *cobra.Command {
 	var start, end string
 	var measurement, regexpMeasurement []string
-	flags := &flagpole{
+	cmd := &command{
 		measurement:       make(map[string]struct{}),
 		regexpMeasurement: make([]*regexp.Regexp, 0),
 	}
-	cmd := &cobra.Command{
+	cmd.cobraCmd = &cobra.Command{
 		Args:          cobra.NoArgs,
 		Use:           "export",
 		Short:         "Export tsm files into InfluxDB line protocol format",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(c *cobra.Command, args []string) error {
-			processFlags(flags, start, end, measurement, regexpMeasurement)
-			return runE(flags)
+			return cmd.runE(start, end, measurement, regexpMeasurement)
 		},
 	}
-	cmd.Flags().SortFlags = false
-	cmd.Flags().StringVarP(&flags.dataDir, "datadir", "D", "", "data storage path (required)")
-	cmd.Flags().StringVarP(&flags.walDir, "waldir", "W", "", "wal storage path (required)")
-	cmd.Flags().StringVarP(&flags.out, "out", "o", "./export", "'-' for standard out or the destination file to export to")
-	cmd.Flags().StringVarP(&flags.database, "database", "d", "", "database to export without _internal (default: all)")
-	cmd.Flags().StringVarP(&flags.retentionPolicy, "retention-policy", "r", "", "retention policy to export (require database)")
-	cmd.Flags().StringArrayVarP(&measurement, "measurement", "m", []string{}, "measurement to export, can be set multiple times (require database, default: all)")
-	cmd.Flags().StringArrayVarP(&regexpMeasurement, "regexp-measurement", "M", []string{}, "regexp measurement to export, can be set multiple times (require database, default: all)")
-	cmd.Flags().StringVarP(&start, "start", "S", "", "start time to export (RFC3339 format, optional)")
-	cmd.Flags().StringVarP(&end, "end", "E", "", "end time to export (RFC3339 format, optional)")
-	cmd.Flags().BoolVarP(&flags.lponly, "lponly", "l", false, "only export line protocol (default: false)")
-	cmd.Flags().BoolVarP(&flags.compress, "compress", "c", false, "compress the output (default: false)")
-	cmd.MarkFlagRequired("datadir")
-	cmd.MarkFlagRequired("waldir")
-	return cmd
+	flags := cmd.cobraCmd.Flags()
+	flags.SortFlags = false
+	flags.StringVarP(&cmd.dataDir, "datadir", "D", "", "data storage path (required)")
+	flags.StringVarP(&cmd.walDir, "waldir", "W", "", "wal storage path (required)")
+	flags.StringVarP(&cmd.out, "out", "o", "./export", "'-' for standard out or the destination file to export to")
+	flags.StringVarP(&cmd.database, "database", "d", "", "database to export without _internal (default: all)")
+	flags.StringVarP(&cmd.retentionPolicy, "retention-policy", "r", "", "retention policy to export (require database)")
+	flags.StringArrayVarP(&measurement, "measurement", "m", []string{}, "measurement to export, can be set multiple times (require database, default: all)")
+	flags.StringArrayVarP(&regexpMeasurement, "regexp-measurement", "M", []string{}, "regexp measurement to export, can be set multiple times (require database, default: all)")
+	flags.StringVarP(&start, "start", "S", "", "start time to export (RFC3339 format, optional)")
+	flags.StringVarP(&end, "end", "E", "", "end time to export (RFC3339 format, optional)")
+	flags.BoolVarP(&cmd.lponly, "lponly", "l", false, "only export line protocol (default: false)")
+	flags.BoolVarP(&cmd.compress, "compress", "c", false, "compress the output (default: false)")
+	cmd.cobraCmd.MarkFlagRequired("datadir")
+	cmd.cobraCmd.MarkFlagRequired("waldir")
+	return cmd.cobraCmd
 }
 
-func (flags *flagpole) usingStdOut() bool {
-	return flags.out == stdoutMark
+func (cmd *command) usingStdOut() bool {
+	return cmd.out == stdoutMark
 }
 
-func (flags *flagpole) matchMeasurement(m string) bool {
-	if len(flags.measurement) == 0 && len(flags.regexpMeasurement) == 0 {
+func (cmd *command) matchMeasurement(m string) bool {
+	if len(cmd.measurement) == 0 && len(cmd.regexpMeasurement) == 0 {
 		return true
 	}
-	if len(flags.measurement) > 0 {
-		if _, ok := flags.measurement[m]; ok {
+	if len(cmd.measurement) > 0 {
+		if _, ok := cmd.measurement[m]; ok {
 			return true
 		}
 	}
-	if len(flags.regexpMeasurement) > 0 {
-		for _, rem := range flags.regexpMeasurement {
+	if len(cmd.regexpMeasurement) > 0 {
+		for _, rem := range cmd.regexpMeasurement {
 			if rem.MatchString(m) {
 				return true
 			}
@@ -104,77 +105,78 @@ func (flags *flagpole) matchMeasurement(m string) bool {
 	return false
 }
 
-func (flags *flagpole) withMeasurement() string {
-	if len(flags.measurement) > 0 && len(flags.regexpMeasurement) > 0 {
-		return fmt.Sprintf(" with %d measurements and %d regexp measurements", len(flags.measurement), len(flags.regexpMeasurement))
-	} else if len(flags.measurement) > 0 {
-		return fmt.Sprintf(" with %d measurements", len(flags.measurement))
-	} else if len(flags.regexpMeasurement) > 0 {
-		return fmt.Sprintf(" with %d regexp measurements", len(flags.regexpMeasurement))
+func (cmd *command) withMeasurement() string {
+	if len(cmd.measurement) > 0 && len(cmd.regexpMeasurement) > 0 {
+		return fmt.Sprintf(" with %d measurements and %d regexp measurements", len(cmd.measurement), len(cmd.regexpMeasurement))
+	} else if len(cmd.measurement) > 0 {
+		return fmt.Sprintf(" with %d measurements", len(cmd.measurement))
+	} else if len(cmd.regexpMeasurement) > 0 {
+		return fmt.Sprintf(" with %d regexp measurements", len(cmd.regexpMeasurement))
 	} else {
 		return ""
 	}
 }
 
-func processFlags(flags *flagpole, start, end string, measurement, regexpMeasurement []string) {
+func (cmd *command) validate(start, end string, measurement, regexpMeasurement []string) {
 	if start != "" {
 		s, err := time.Parse(time.RFC3339, start)
 		if err != nil {
 			log.Fatal("start time is invalid")
 		}
-		flags.startTime = s.UnixNano()
+		cmd.startTime = s.UnixNano()
 	} else {
-		flags.startTime = math.MinInt64
+		cmd.startTime = math.MinInt64
 	}
 	if end != "" {
 		e, err := time.Parse(time.RFC3339, end)
 		if err != nil {
 			log.Fatal("end time is invalid")
 		}
-		flags.endTime = e.UnixNano()
+		cmd.endTime = e.UnixNano()
 	} else {
-		flags.endTime = math.MaxInt64
+		cmd.endTime = math.MaxInt64
 	}
-	if flags.startTime != 0 && flags.endTime != 0 && flags.endTime < flags.startTime {
+	if cmd.startTime != 0 && cmd.endTime != 0 && cmd.endTime < cmd.startTime {
 		log.Fatal("end time before start time")
 	}
-	if flags.database == "_internal" {
+	if cmd.database == "_internal" {
 		log.Fatal("database cannot be _internal")
 	}
-	if flags.retentionPolicy != "" && flags.database == "" {
+	if cmd.retentionPolicy != "" && cmd.database == "" {
 		log.Fatal("must specify a database when retention policy given")
 	}
-	if len(flags.measurement) > 0 && flags.database == "" {
+	if len(cmd.measurement) > 0 && cmd.database == "" {
 		log.Fatal("must specify a database when measurement given")
 	}
 	for _, str := range measurement {
-		flags.measurement[str] = struct{}{}
+		cmd.measurement[str] = struct{}{}
 	}
-	if len(flags.regexpMeasurement) > 0 && flags.database == "" {
+	if len(cmd.regexpMeasurement) > 0 && cmd.database == "" {
 		log.Fatal("must specify a database when regexp measurement given")
 	}
 	for _, str := range regexpMeasurement {
 		if rem, err := regexp.Compile(str); err == nil {
-			flags.regexpMeasurement = append(flags.regexpMeasurement, rem)
+			cmd.regexpMeasurement = append(cmd.regexpMeasurement, rem)
 		} else {
 			log.Fatalf("regexp measurement: %s, compile error: %v", str, err)
 		}
 	}
 }
 
-func runE(flags *flagpole) error {
-	if err := walkTSMFiles(flags); err != nil {
+func (cmd *command) runE(start, end string, measurement, regexpMeasurement []string) error {
+	cmd.validate(start, end, measurement, regexpMeasurement)
+	if err := cmd.walkTSMFiles(); err != nil {
 		return err
 	}
-	if err := walkWALFiles(flags); err != nil {
+	if err := cmd.walkWALFiles(); err != nil {
 		return err
 	}
 
-	return write(flags)
+	return cmd.write()
 }
 
-func walkTSMFiles(flags *flagpole) error {
-	return filepath.Walk(flags.dataDir, func(path string, f os.FileInfo, err error) error {
+func (cmd *command) walkTSMFiles() error {
+	return filepath.Walk(cmd.dataDir, func(path string, f os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -184,7 +186,7 @@ func walkTSMFiles(flags *flagpole) error {
 			return nil
 		}
 
-		relPath, err := filepath.Rel(flags.dataDir, path)
+		relPath, err := filepath.Rel(cmd.dataDir, path)
 		if err != nil {
 			return err
 		}
@@ -192,8 +194,8 @@ func walkTSMFiles(flags *flagpole) error {
 		if len(dirs) < 2 {
 			return fmt.Errorf("invalid directory structure for %s", path)
 		}
-		if dirs[0] != "_internal" && (dirs[0] == flags.database || flags.database == "") {
-			if dirs[1] == flags.retentionPolicy || flags.retentionPolicy == "" {
+		if dirs[0] != "_internal" && (dirs[0] == cmd.database || cmd.database == "") {
+			if dirs[1] == cmd.retentionPolicy || cmd.retentionPolicy == "" {
 				key := filepath.Join(dirs[0], dirs[1])
 				manifest[key] = struct{}{}
 				tsmFiles[key] = append(tsmFiles[key], path)
@@ -203,8 +205,8 @@ func walkTSMFiles(flags *flagpole) error {
 	})
 }
 
-func walkWALFiles(flags *flagpole) error {
-	return filepath.Walk(flags.walDir, func(path string, f os.FileInfo, err error) error {
+func (cmd *command) walkWALFiles() error {
+	return filepath.Walk(cmd.walDir, func(path string, f os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -215,7 +217,7 @@ func walkWALFiles(flags *flagpole) error {
 			return nil
 		}
 
-		relPath, err := filepath.Rel(flags.walDir, path)
+		relPath, err := filepath.Rel(cmd.walDir, path)
 		if err != nil {
 			return err
 		}
@@ -223,8 +225,8 @@ func walkWALFiles(flags *flagpole) error {
 		if len(dirs) < 2 {
 			return fmt.Errorf("invalid directory structure for %s", path)
 		}
-		if dirs[0] != "_internal" && (dirs[0] == flags.database || flags.database == "") {
-			if dirs[1] == flags.retentionPolicy || flags.retentionPolicy == "" {
+		if dirs[0] != "_internal" && (dirs[0] == cmd.database || cmd.database == "") {
+			if dirs[1] == cmd.retentionPolicy || cmd.retentionPolicy == "" {
 				key := filepath.Join(dirs[0], dirs[1])
 				manifest[key] = struct{}{}
 				walFiles[key] = append(walFiles[key], path)
@@ -234,7 +236,7 @@ func walkWALFiles(flags *flagpole) error {
 	})
 }
 
-func writeDDL(flags *flagpole, mw io.Writer, w io.Writer) error {
+func (cmd *command) writeDDL(mw io.Writer, w io.Writer) error {
 	// Write out all the DDL
 	fmt.Fprintln(mw, "# DDL")
 	for key := range manifest {
@@ -246,10 +248,10 @@ func writeDDL(flags *flagpole, mw io.Writer, w io.Writer) error {
 	return nil
 }
 
-func writeDML(flags *flagpole, mw io.Writer, w io.Writer) error {
+func (cmd *command) writeDML(mw io.Writer, w io.Writer) error {
 	fmt.Fprintln(mw, "# DML")
 	var msgOut io.Writer
-	if flags.usingStdOut() {
+	if cmd.usingStdOut() {
 		msgOut = os.Stderr
 	} else {
 		msgOut = os.Stdout
@@ -259,15 +261,15 @@ func writeDML(flags *flagpole, mw io.Writer, w io.Writer) error {
 		fmt.Fprintf(mw, "# CONTEXT-DATABASE:%s\n", keys[0])
 		fmt.Fprintf(mw, "# CONTEXT-RETENTION-POLICY:%s\n", keys[1])
 		if files, ok := tsmFiles[key]; ok {
-			fmt.Fprintf(msgOut, "writing out tsm file data for %s%s...", key, flags.withMeasurement())
-			if err := writeTsmFiles(flags, mw, w, files); err != nil {
+			fmt.Fprintf(msgOut, "writing out tsm file data for %s%s...", key, cmd.withMeasurement())
+			if err := cmd.writeTsmFiles(mw, w, files); err != nil {
 				return err
 			}
 			fmt.Fprintln(msgOut, "complete.")
 		}
 		if _, ok := walFiles[key]; ok {
-			fmt.Fprintf(msgOut, "writing out wal file data for %s%s...", key, flags.withMeasurement())
-			if err := writeWALFiles(flags, mw, w, walFiles[key], key); err != nil {
+			fmt.Fprintf(msgOut, "writing out wal file data for %s%s...", key, cmd.withMeasurement())
+			if err := cmd.writeWALFiles(mw, w, walFiles[key], key); err != nil {
 				return err
 			}
 			fmt.Fprintln(msgOut, "complete.")
@@ -284,31 +286,31 @@ func writeDML(flags *flagpole, mw io.Writer, w io.Writer) error {
 // Typically mw and w are the same but if we'd like to, for example, filter out
 // comments and other meta data, we can pass ioutil.Discard to mw to only
 // include the raw data that writeFull() generates.
-func writeFull(flags *flagpole, mw io.Writer, w io.Writer) error {
-	s, e := time.Unix(0, flags.startTime).Format(time.RFC3339), time.Unix(0, flags.endTime).Format(time.RFC3339)
+func (cmd *command) writeFull(mw io.Writer, w io.Writer) error {
+	s, e := time.Unix(0, cmd.startTime).Format(time.RFC3339), time.Unix(0, cmd.endTime).Format(time.RFC3339)
 
 	fmt.Fprintf(mw, "# INFLUXDB EXPORT: %s - %s\n", s, e)
 
-	if shouldWriteDDL := !flags.lponly; shouldWriteDDL {
-		if err := writeDDL(flags, mw, w); err != nil {
+	if shouldWriteDDL := !cmd.lponly; shouldWriteDDL {
+		if err := cmd.writeDDL(mw, w); err != nil {
 			return err
 		}
 	}
 
-	if err := writeDML(flags, mw, w); err != nil {
+	if err := cmd.writeDML(mw, w); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func write(flags *flagpole) error {
+func (cmd *command) write() error {
 	var w io.Writer
-	if flags.usingStdOut() {
+	if cmd.usingStdOut() {
 		w = os.Stdout
 	} else {
 		// open our output file and create an output buffer
-		f, err := os.Create(flags.out)
+		f, err := os.Create(cmd.out)
 		if err != nil {
 			return err
 		}
@@ -322,7 +324,7 @@ func write(flags *flagpole) error {
 	defer bw.Flush()
 	w = bw
 
-	if flags.compress {
+	if cmd.compress {
 		gzw := gzip.NewWriter(w)
 		defer gzw.Close()
 		w = gzw
@@ -338,21 +340,21 @@ func write(flags *flagpole) error {
 	// data..
 	//
 	mw := w
-	if flags.lponly {
+	if cmd.lponly {
 		mw = ioutil.Discard
 	}
 
-	return writeFull(flags, mw, w)
+	return cmd.writeFull(mw, w)
 }
 
-func writeTsmFiles(flags *flagpole, mw io.Writer, w io.Writer, files []string) error {
+func (cmd *command) writeTsmFiles(mw io.Writer, w io.Writer, files []string) error {
 	fmt.Fprintln(mw, "# writing tsm data")
 
 	// we need to make sure we write the same order that the files were written
 	sort.Strings(files)
 
 	for _, f := range files {
-		if err := exportTSMFile(flags, f, w); err != nil {
+		if err := cmd.exportTSMFile(f, w); err != nil {
 			return err
 		}
 	}
@@ -360,7 +362,7 @@ func writeTsmFiles(flags *flagpole, mw io.Writer, w io.Writer, files []string) e
 	return nil
 }
 
-func exportTSMFile(flags *flagpole, tsmFilePath string, w io.Writer) error {
+func (cmd *command) exportTSMFile(tsmFilePath string, w io.Writer) error {
 	f, err := os.Open(tsmFilePath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -378,7 +380,7 @@ func exportTSMFile(flags *flagpole, tsmFilePath string, w io.Writer) error {
 	}
 	defer r.Close()
 
-	if sgStart, sgEnd := r.TimeRange(); sgStart > flags.endTime || sgEnd < flags.startTime {
+	if sgStart, sgEnd := r.TimeRange(); sgStart > cmd.endTime || sgEnd < cmd.startTime {
 		return nil
 	}
 
@@ -391,12 +393,12 @@ func exportTSMFile(flags *flagpole, tsmFilePath string, w io.Writer) error {
 		}
 		seriesKey, field := tsm1.SeriesAndFieldFromCompositeKey(key)
 		name := models.ParseName(seriesKey)
-		if !flags.matchMeasurement(string(name)) {
+		if !cmd.matchMeasurement(string(name)) {
 			continue
 		}
 		// seriesKey are stored escaped, field names are not
 		field = escape.Bytes(field)
-		if err := writeValues(flags, w, seriesKey, string(field), values); err != nil {
+		if err := cmd.writeValues(w, seriesKey, string(field), values); err != nil {
 			// An error from writeValues indicates an IO error, which should be returned.
 			return err
 		}
@@ -404,7 +406,7 @@ func exportTSMFile(flags *flagpole, tsmFilePath string, w io.Writer) error {
 	return nil
 }
 
-func writeWALFiles(flags *flagpole, mw io.Writer, w io.Writer, files []string, key string) error {
+func (cmd *command) writeWALFiles(mw io.Writer, w io.Writer, files []string, key string) error {
 	fmt.Fprintln(mw, "# writing wal data")
 
 	// we need to make sure we write the same order that the wal received the data
@@ -423,7 +425,7 @@ or manually editing the exported file.
 	}
 
 	for _, f := range files {
-		if err := exportWALFile(flags, f, w, warnDelete); err != nil {
+		if err := cmd.exportWALFile(f, w, warnDelete); err != nil {
 			return err
 		}
 	}
@@ -432,7 +434,7 @@ or manually editing the exported file.
 }
 
 // exportWAL reads every WAL entry from r and exports it to w.
-func exportWALFile(flags *flagpole, walFilePath string, w io.Writer, warnDelete func()) error {
+func (cmd *command) exportWALFile(walFilePath string, w io.Writer, warnDelete func()) error {
 	f, err := os.Open(walFilePath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -462,12 +464,12 @@ func exportWALFile(flags *flagpole, walFilePath string, w io.Writer, warnDelete 
 			for key, values := range t.Values {
 				seriesKey, field := tsm1.SeriesAndFieldFromCompositeKey([]byte(key))
 				name := models.ParseName(seriesKey)
-				if !flags.matchMeasurement(string(name)) {
+				if !cmd.matchMeasurement(string(name)) {
 					continue
 				}
 				// seriesKey are stored escaped, field names are not
 				field = escape.Bytes(field)
-				if err := writeValues(flags, w, seriesKey, string(field), values); err != nil {
+				if err := cmd.writeValues(w, seriesKey, string(field), values); err != nil {
 					// An error from writeValues indicates an IO error, which should be returned.
 					return err
 				}
@@ -479,13 +481,13 @@ func exportWALFile(flags *flagpole, walFilePath string, w io.Writer, warnDelete 
 
 // writeValues writes every value in values to w, using the given series key and field name.
 // If any call to w.Write fails, that error is returned.
-func writeValues(flags *flagpole, w io.Writer, seriesKey []byte, field string, values []tsm1.Value) error {
+func (cmd *command) writeValues(w io.Writer, seriesKey []byte, field string, values []tsm1.Value) error {
 	buf := []byte(string(seriesKey) + " " + field + "=")
 	prefixLen := len(buf)
 
 	for _, value := range values {
 		ts := value.UnixNano()
-		if (ts < flags.startTime) || (ts > flags.endTime) {
+		if (ts < cmd.startTime) || (ts > cmd.endTime) {
 			continue
 		}
 

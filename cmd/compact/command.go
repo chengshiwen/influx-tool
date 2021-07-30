@@ -20,41 +20,44 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type flagpole struct {
-	path   string
-	force  bool
-	worker int
+type command struct {
+	cobraCmd *cobra.Command
+	path     string
+	force    bool
+	worker   int
 }
 
 func NewCommand() *cobra.Command {
-	flags := &flagpole{}
-	cmd := &cobra.Command{
+	cmd := &command{}
+	cmd.cobraCmd = &cobra.Command{
 		Args:          cobra.NoArgs,
 		Use:           "compact",
 		Short:         "Compact the all shards fully",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(c *cobra.Command, args []string) error {
-			processFlags(flags)
-			return runE(flags)
+			return cmd.runE()
 		},
 	}
-	cmd.Flags().SortFlags = false
-	cmd.Flags().StringVarP(&flags.path, "path", "p", "", "path of shard to be compacted like /path/to/influxdb/data/db/rp (required)")
-	cmd.Flags().BoolVarP(&flags.force, "force", "f", false, "force compaction without prompting (default: false)")
-	cmd.Flags().IntVarP(&flags.worker, "worker", "w", 0, "number of concurrent workers to compact (default: 0, unlimited)")
-	cmd.MarkFlagRequired("path")
-	return cmd
+	flags := cmd.cobraCmd.Flags()
+	flags.SortFlags = false
+	flags.StringVarP(&cmd.path, "path", "p", "", "path of shard to be compacted like /path/to/influxdb/data/db/rp (required)")
+	flags.BoolVarP(&cmd.force, "force", "f", false, "force compaction without prompting (default: false)")
+	flags.IntVarP(&cmd.worker, "worker", "w", 0, "number of concurrent workers to compact (default: 0, unlimited)")
+	cmd.cobraCmd.MarkFlagRequired("path")
+	return cmd.cobraCmd
 }
 
-func processFlags(flags *flagpole) {
-	if flags.worker < 0 {
+func (cmd *command) validate() {
+	if cmd.worker < 0 {
 		log.Fatal("worker is invalid")
 	}
 }
 
-func runE(flags *flagpole) (err error) {
-	files, err := ioutil.ReadDir(flags.path)
+func (cmd *command) runE() (err error) {
+	cmd.validate()
+
+	files, err := ioutil.ReadDir(cmd.path)
 	if err != nil {
 		return
 	}
@@ -64,13 +67,13 @@ func runE(flags *flagpole) (err error) {
 		if !file.IsDir() || !reg.MatchString(file.Name()) {
 			return errors.New("shard-path is invalid, it should be like /path/to/influxdb/data/db/rp")
 		}
-		paths = append(paths, filepath.Join(flags.path, file.Name()))
+		paths = append(paths, filepath.Join(cmd.path, file.Name()))
 	}
 
 	log.SetFlags(0)
-	log.Printf("opening shard at path %q", flags.path)
+	log.Printf("opening shard at path %q", cmd.path)
 
-	if !flags.force {
+	if !cmd.force {
 		fmt.Print("proceed? [N] ")
 		scan := bufio.NewScanner(os.Stdin)
 		scan.Scan()
@@ -85,18 +88,18 @@ func runE(flags *flagpole) (err error) {
 
 	log.Print("compacting shard")
 
-	limit := make(chan struct{}, flags.worker)
+	limit := make(chan struct{}, cmd.worker)
 	wg := &sync.WaitGroup{}
 	for _, path := range paths {
 		wg.Add(1)
 		path := path
 		go func() {
-			if flags.worker > 0 {
+			if cmd.worker > 0 {
 				limit <- struct{}{}
 			}
 			defer func() {
 				wg.Done()
-				if flags.worker > 0 {
+				if cmd.worker > 0 {
 					<-limit
 				}
 			}()

@@ -16,7 +16,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type flagpole struct {
+type command struct {
+	cobraCmd        *cobra.Command
 	sourceDir       string
 	targetDir       string
 	database        string
@@ -34,89 +35,91 @@ type flagpole struct {
 
 func NewCommand() *cobra.Command {
 	var start, end string
-	flags := &flagpole{nodeIndex: make(intSet)}
-	cmd := &cobra.Command{
+	cmd := &command{nodeIndex: make(intSet)}
+	cmd.cobraCmd = &cobra.Command{
 		Args:          cobra.NoArgs,
 		Use:           "transfer",
 		Short:         "Transfer influxdb persist data on disk from one to another",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(c *cobra.Command, args []string) error {
-			processFlags(flags, start, end)
-			return runE(flags)
+			return cmd.runE(start, end)
 		},
 	}
-	cmd.Flags().SortFlags = false
-	cmd.Flags().StringVarP(&flags.sourceDir, "source-dir", "s", "", "source influxdb directory containing meta, data and wal (required)")
-	cmd.Flags().StringVarP(&flags.targetDir, "target-dir", "t", "", "target influxdb directory containing meta, data and wal (required)")
-	cmd.Flags().StringVarP(&flags.database, "database", "d", "", "database name (required)")
-	cmd.Flags().StringVarP(&flags.retentionPolicy, "retention-policy", "r", "autogen", "retention policy")
-	cmd.Flags().DurationVar(&flags.duration, "duration", time.Hour*0, "retention policy duration (default: 0)")
-	cmd.Flags().DurationVar(&flags.shardDuration, "shard-duration", time.Hour*24*7, "retention policy shard duration")
-	cmd.Flags().StringVarP(&start, "start", "S", "", "start time to transfer (RFC3339 format, optional)")
-	cmd.Flags().StringVarP(&end, "end", "E", "", "end time to transfer (RFC3339 format, optional)")
-	cmd.Flags().IntVarP(&flags.worker, "worker", "w", 0, "number of concurrent workers to transfer (default: 0, unlimited)")
-	cmd.Flags().BoolVar(&flags.skipTsi, "skip-tsi", false, "skip building TSI index on disk (default: false)")
-	cmd.Flags().IntVarP(&flags.nodeTotal, "node-total", "n", 1, "total number of node in target circle")
-	cmd.Flags().VarP(&flags.nodeIndex, "node-index", "i", "index of node in target circle delimited by comma, [0, node-total) (default: all)")
-	cmd.Flags().StringVarP(&flags.hashKey, "hash-key", "k", "idx", "hash key for influx proxy, valid options are idx or exi")
-	cmd.MarkFlagRequired("source-dir")
-	cmd.MarkFlagRequired("target-dir")
-	cmd.MarkFlagRequired("database")
-	return cmd
+	flags := cmd.cobraCmd.Flags()
+	flags.SortFlags = false
+	flags.StringVarP(&cmd.sourceDir, "source-dir", "s", "", "source influxdb directory containing meta, data and wal (required)")
+	flags.StringVarP(&cmd.targetDir, "target-dir", "t", "", "target influxdb directory containing meta, data and wal (required)")
+	flags.StringVarP(&cmd.database, "database", "d", "", "database name (required)")
+	flags.StringVarP(&cmd.retentionPolicy, "retention-policy", "r", "autogen", "retention policy")
+	flags.DurationVar(&cmd.duration, "duration", time.Hour*0, "retention policy duration (default: 0)")
+	flags.DurationVar(&cmd.shardDuration, "shard-duration", time.Hour*24*7, "retention policy shard duration")
+	flags.StringVarP(&start, "start", "S", "", "start time to transfer (RFC3339 format, optional)")
+	flags.StringVarP(&end, "end", "E", "", "end time to transfer (RFC3339 format, optional)")
+	flags.IntVarP(&cmd.worker, "worker", "w", 0, "number of concurrent workers to transfer (default: 0, unlimited)")
+	flags.BoolVar(&cmd.skipTsi, "skip-tsi", false, "skip building TSI index on disk (default: false)")
+	flags.IntVarP(&cmd.nodeTotal, "node-total", "n", 1, "total number of node in target circle")
+	flags.VarP(&cmd.nodeIndex, "node-index", "i", "index of node in target circle delimited by comma, [0, node-total) (default: all)")
+	flags.StringVarP(&cmd.hashKey, "hash-key", "k", "idx", "hash key for influx proxy, valid options are idx or exi")
+	cmd.cobraCmd.MarkFlagRequired("source-dir")
+	cmd.cobraCmd.MarkFlagRequired("target-dir")
+	cmd.cobraCmd.MarkFlagRequired("database")
+	return cmd.cobraCmd
 }
 
-func processFlags(flags *flagpole, start, end string) {
+func (cmd *command) validate(start, end string) {
 	if start != "" {
 		s, err := time.Parse(time.RFC3339, start)
 		if err != nil {
 			log.Fatal("start time is invalid")
 		}
-		flags.startTime = s.UnixNano()
+		cmd.startTime = s.UnixNano()
 	} else {
-		flags.startTime = math.MinInt64
+		cmd.startTime = math.MinInt64
 	}
 	if end != "" {
 		e, err := time.Parse(time.RFC3339, end)
 		if err != nil {
 			log.Fatal("end time is invalid")
 		}
-		flags.endTime = e.UnixNano()
+		cmd.endTime = e.UnixNano()
 	} else {
-		flags.endTime = math.MaxInt64
+		cmd.endTime = math.MaxInt64
 	}
-	if flags.startTime != 0 && flags.endTime != 0 && flags.endTime < flags.startTime {
+	if cmd.startTime != 0 && cmd.endTime != 0 && cmd.endTime < cmd.startTime {
 		log.Fatal("end time before start time")
 	}
 
-	if flags.worker < 0 {
+	if cmd.worker < 0 {
 		log.Fatal("worker is invalid")
 	}
-	if flags.nodeTotal <= 0 {
+	if cmd.nodeTotal <= 0 {
 		log.Fatal("node-total is invalid")
 	}
-	for idx := range flags.nodeIndex {
-		if idx < 0 || idx >= flags.nodeTotal {
+	for idx := range cmd.nodeIndex {
+		if idx < 0 || idx >= cmd.nodeTotal {
 			log.Fatal("node-index is invalid")
 		}
 	}
-	if len(flags.nodeIndex) == 0 {
-		for idx := 0; idx < flags.nodeTotal; idx++ {
-			flags.nodeIndex[idx] = struct{}{}
+	if len(cmd.nodeIndex) == 0 {
+		for idx := 0; idx < cmd.nodeTotal; idx++ {
+			cmd.nodeIndex[idx] = struct{}{}
 		}
 	}
-	if flags.hashKey != "idx" && flags.hashKey != "exi" {
+	if cmd.hashKey != "idx" && cmd.hashKey != "exi" {
 		log.Fatal("hash-key is invalid")
 	}
 }
 
-func runE(flags *flagpole) (err error) {
-	exportServer, err := server.NewServer(flags.sourceDir, !flags.skipTsi)
+func (cmd *command) runE(start, end string) (err error) {
+	cmd.validate(start, end)
+
+	exportServer, err := server.NewServer(cmd.sourceDir, !cmd.skipTsi)
 	if err != nil {
 		return
 	}
 	defer exportServer.Close()
-	exp, err := newExporter(exportServer, flags.database, flags.retentionPolicy, flags.shardDuration, flags.startTime, flags.endTime)
+	exp, err := newExporter(exportServer, cmd.database, cmd.retentionPolicy, cmd.shardDuration, cmd.startTime, cmd.endTime)
 	if err != nil {
 		return
 	}
@@ -131,26 +134,26 @@ func runE(flags *flagpole) (err error) {
 			svr.Close()
 		}
 	}()
-	for idx := range flags.nodeIndex {
-		importServer, err := server.NewServer(fmt.Sprintf("%s-%d", flags.targetDir, idx), !flags.skipTsi)
+	for idx := range cmd.nodeIndex {
+		importServer, err := server.NewServer(fmt.Sprintf("%s-%d", cmd.targetDir, idx), !cmd.skipTsi)
 		if err != nil {
 			return err
 		}
 		svrs[idx] = importServer
-		imp, err := newImporter(importServer, flags.database, flags.retentionPolicy, flags.shardDuration, flags.duration, !flags.skipTsi)
+		imp, err := newImporter(importServer, cmd.database, cmd.retentionPolicy, cmd.shardDuration, cmd.duration, !cmd.skipTsi)
 		if err != nil {
 			return err
 		}
 		imps[idx] = imp
 	}
 
-	transfer(flags, exp, imps)
+	cmd.transfer(exp, imps)
 	return
 }
 
-func transfer(flags *flagpole, exp *exporter, imps map[int]*importer) {
+func (cmd *command) transfer(exp *exporter, imps map[int]*importer) {
 	log.SetFlags(log.LstdFlags)
-	log.Printf("transfer node total: %d, node index: %s, hash key: %s", flags.nodeTotal, flags.nodeIndex, flags.hashKey)
+	log.Printf("transfer node total: %d, node index: %s, hash key: %s", cmd.nodeTotal, cmd.nodeIndex, cmd.hashKey)
 	start := time.Now().UTC()
 	defer func() {
 		elapsed := time.Since(start)
@@ -162,7 +165,7 @@ func transfer(flags *flagpole, exp *exporter, imps map[int]*importer) {
 	}()
 
 	prChans := make(map[int]chan *nio.PipeReader)
-	for idx := range flags.nodeIndex {
+	for idx := range cmd.nodeIndex {
 		prChans[idx] = make(chan *nio.PipeReader, 4)
 	}
 
@@ -172,7 +175,7 @@ func transfer(flags *flagpole, exp *exporter, imps map[int]*importer) {
 				close(prChan)
 			}
 		}()
-		exp.WriteTo(prChans, flags.nodeTotal, flags.hashKey, flags.worker)
+		exp.WriteTo(prChans, cmd.nodeTotal, cmd.hashKey, cmd.worker)
 	}()
 
 	wg := &sync.WaitGroup{}
@@ -181,14 +184,14 @@ func transfer(flags *flagpole, exp *exporter, imps map[int]*importer) {
 		idx := idx
 		go func() {
 			defer wg.Done()
-			transferNode(imps[idx], prChans[idx], idx)
+			cmd.transferNode(imps[idx], prChans[idx], idx)
 		}()
 	}
 	wg.Wait()
 	log.Print("transfer done")
 }
 
-func transferNode(imp *importer, prChan chan *nio.PipeReader, idx int) {
+func (cmd *command) transferNode(imp *importer, prChan chan *nio.PipeReader, idx int) {
 	log.Printf("node index %d transfer start", idx)
 	wg := &sync.WaitGroup{}
 	for pr := range prChan {

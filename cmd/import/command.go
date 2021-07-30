@@ -9,7 +9,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type flagpole struct {
+type command struct {
+	cobraCmd     *cobra.Command
 	host         string
 	port         int
 	ssl          bool
@@ -18,44 +19,45 @@ type flagpole struct {
 }
 
 func NewCommand() *cobra.Command {
-	flags := &flagpole{}
-	cmd := &cobra.Command{
+	cmd := &command{}
+	cmd.cobraCmd = &cobra.Command{
 		Args:          cobra.NoArgs,
 		Use:           "import",
 		Short:         "Import a previous export from file",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(c *cobra.Command, args []string) error {
-			processFlags(flags)
-			return runE(flags)
+			return cmd.runE()
 		},
 	}
-	cmd.Flags().SortFlags = false
-	cmd.Flags().StringVarP(&flags.host, "host", "H", "127.0.0.1", "host to connect to")
-	cmd.Flags().IntVarP(&flags.port, "port", "P", 8086, "port to connect to")
-	cmd.Flags().StringVarP(&flags.clientConfig.Username, "username", "u", "", "username to connect to the server")
-	cmd.Flags().StringVarP(&flags.clientConfig.Password, "password", "p", "", "password to connect to the server")
-	cmd.Flags().BoolVarP(&flags.ssl, "ssl", "s", false, "use https for requests (default: false)")
-	cmd.Flags().StringVarP(&flags.config.Path, "path", "f", "", "path to the file to import (required)")
-	cmd.Flags().BoolVarP(&flags.config.Compressed, "compressed", "c", false, "set to true if the import file is compressed (default: false)")
-	cmd.Flags().IntVar(&flags.config.PPS, "pps", 0, "points per second the import will allow (default: 0, unlimited)")
-	cmd.MarkFlagRequired("path")
-	return cmd
+	flags := cmd.cobraCmd.Flags()
+	flags.SortFlags = false
+	flags.StringVarP(&cmd.host, "host", "H", "127.0.0.1", "host to connect to")
+	flags.IntVarP(&cmd.port, "port", "P", 8086, "port to connect to")
+	flags.StringVarP(&cmd.clientConfig.Username, "username", "u", "", "username to connect to the server")
+	flags.StringVarP(&cmd.clientConfig.Password, "password", "p", "", "password to connect to the server")
+	flags.BoolVarP(&cmd.ssl, "ssl", "s", false, "use https for requests (default: false)")
+	flags.StringVarP(&cmd.config.Path, "path", "f", "", "path to the file to import (required)")
+	flags.BoolVarP(&cmd.config.Compressed, "compressed", "c", false, "set to true if the import file is compressed (default: false)")
+	flags.IntVar(&cmd.config.PPS, "pps", 0, "points per second the import will allow (default: 0, unlimited)")
+	cmd.cobraCmd.MarkFlagRequired("path")
+	return cmd.cobraCmd
 }
 
-func processFlags(flags *flagpole) {
-	addr := fmt.Sprintf("%s:%d", flags.host, flags.port)
-	url, err := client.ParseConnectionString(addr, flags.ssl)
+func (cmd *command) validate() {
+	addr := fmt.Sprintf("%s:%d", cmd.host, cmd.port)
+	url, err := client.ParseConnectionString(addr, cmd.ssl)
 	if err != nil {
 		log.Fatalf("parse url error: %s", err)
 	}
-	flags.clientConfig.URL = url
-	flags.clientConfig.UnsafeSsl = flags.ssl
+	cmd.clientConfig.URL = url
+	cmd.clientConfig.UnsafeSsl = cmd.ssl
 }
 
-func runE(flags *flagpole) error {
-	config := flags.config
-	config.Config = flags.clientConfig
+func (cmd *command) runE() error {
+	cmd.validate()
+	config := cmd.config
+	config.Config = cmd.clientConfig
 	i := v8.NewImporter(config)
 	if err := i.Import(); err != nil {
 		return err
