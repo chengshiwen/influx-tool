@@ -34,8 +34,13 @@ type command struct {
 	hashKey         string
 }
 
+type tempflag struct {
+	start string
+	end   string
+}
+
 func NewCommand() *cobra.Command {
-	var start, end string
+	tf := &tempflag{}
 	cmd := &command{nodeIndex: make(intSet)}
 	cmd.cobraCmd = &cobra.Command{
 		Args:          cobra.NoArgs,
@@ -44,7 +49,7 @@ func NewCommand() *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(c *cobra.Command, args []string) error {
-			return cmd.runE(start, end)
+			return cmd.runE(tf)
 		},
 	}
 	flags := cmd.cobraCmd.Flags()
@@ -55,8 +60,8 @@ func NewCommand() *cobra.Command {
 	flags.StringVarP(&cmd.retentionPolicy, "retention-policy", "r", "autogen", "retention policy")
 	flags.DurationVar(&cmd.duration, "duration", time.Hour*0, "retention policy duration (default: 0)")
 	flags.DurationVar(&cmd.shardDuration, "shard-duration", time.Hour*24*7, "retention policy shard duration")
-	flags.StringVarP(&start, "start", "S", "", "start time to transfer (RFC3339 format, optional)")
-	flags.StringVarP(&end, "end", "E", "", "end time to transfer (RFC3339 format, optional)")
+	flags.StringVarP(&tf.start, "start", "S", "", "start time to transfer (RFC3339 format, optional)")
+	flags.StringVarP(&tf.end, "end", "E", "", "end time to transfer (RFC3339 format, optional)")
 	flags.IntVarP(&cmd.worker, "worker", "w", 0, "number of concurrent workers to transfer (default: 0, unlimited)")
 	flags.BoolVar(&cmd.skipTsi, "skip-tsi", false, "skip building TSI index on disk (default: false)")
 	flags.IntVarP(&cmd.nodeTotal, "node-total", "n", 1, "total number of node in target circle")
@@ -68,9 +73,9 @@ func NewCommand() *cobra.Command {
 	return cmd.cobraCmd
 }
 
-func (cmd *command) validate(start, end string) error {
-	if start != "" {
-		s, err := time.Parse(time.RFC3339, start)
+func (cmd *command) validate(tf *tempflag) error {
+	if tf.start != "" {
+		s, err := time.Parse(time.RFC3339, tf.start)
 		if err != nil {
 			return errors.New("start time is invalid")
 		}
@@ -78,8 +83,8 @@ func (cmd *command) validate(start, end string) error {
 	} else {
 		cmd.startTime = math.MinInt64
 	}
-	if end != "" {
-		e, err := time.Parse(time.RFC3339, end)
+	if tf.end != "" {
+		e, err := time.Parse(time.RFC3339, tf.end)
 		if err != nil {
 			return errors.New("end time is invalid")
 		}
@@ -113,8 +118,8 @@ func (cmd *command) validate(start, end string) error {
 	return nil
 }
 
-func (cmd *command) runE(start, end string) error {
-	if err := cmd.validate(start, end); err != nil {
+func (cmd *command) runE(tf *tempflag) error {
+	if err := cmd.validate(tf); err != nil {
 		return err
 	}
 	exportServer, err := server.NewServer(cmd.sourceDir, !cmd.skipTsi)

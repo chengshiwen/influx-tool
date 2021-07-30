@@ -43,11 +43,17 @@ type command struct {
 	walFiles map[string][]string
 }
 
+type tempflag struct {
+	start             string
+	end               string
+	measurement       []string
+	regexpMeasurement []string
+}
+
 const stdoutMark = "-"
 
 func NewCommand() *cobra.Command {
-	var start, end string
-	var measurement, regexpMeasurement []string
+	tf := &tempflag{}
 	cmd := &command{
 		measurement:       make(map[string]struct{}),
 		regexpMeasurement: make([]*regexp.Regexp, 0),
@@ -62,7 +68,7 @@ func NewCommand() *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(c *cobra.Command, args []string) error {
-			return cmd.runE(start, end, measurement, regexpMeasurement)
+			return cmd.runE(tf)
 		},
 	}
 	flags := cmd.cobraCmd.Flags()
@@ -72,10 +78,10 @@ func NewCommand() *cobra.Command {
 	flags.StringVarP(&cmd.out, "out", "o", "./export", "'-' for standard out or the destination file to export to")
 	flags.StringVarP(&cmd.database, "database", "d", "", "database to export without _internal (default: all)")
 	flags.StringVarP(&cmd.retentionPolicy, "retention-policy", "r", "", "retention policy to export (require database)")
-	flags.StringArrayVarP(&measurement, "measurement", "m", []string{}, "measurement to export, can be set multiple times (require database, default: all)")
-	flags.StringArrayVarP(&regexpMeasurement, "regexp-measurement", "M", []string{}, "regexp measurement to export, can be set multiple times (require database, default: all)")
-	flags.StringVarP(&start, "start", "S", "", "start time to export (RFC3339 format, optional)")
-	flags.StringVarP(&end, "end", "E", "", "end time to export (RFC3339 format, optional)")
+	flags.StringArrayVarP(&tf.measurement, "measurement", "m", []string{}, "measurement to export, can be set multiple times (require database, default: all)")
+	flags.StringArrayVarP(&tf.regexpMeasurement, "regexp-measurement", "M", []string{}, "regexp measurement to export, can be set multiple times (require database, default: all)")
+	flags.StringVarP(&tf.start, "start", "S", "", "start time to export (RFC3339 format, optional)")
+	flags.StringVarP(&tf.end, "end", "E", "", "end time to export (RFC3339 format, optional)")
 	flags.BoolVarP(&cmd.lponly, "lponly", "l", false, "only export line protocol (default: false)")
 	flags.BoolVarP(&cmd.compress, "compress", "c", false, "compress the output (default: false)")
 	cmd.cobraCmd.MarkFlagRequired("datadir")
@@ -83,9 +89,9 @@ func NewCommand() *cobra.Command {
 	return cmd.cobraCmd
 }
 
-func (cmd *command) validate(start, end string, measurement, regexpMeasurement []string) error {
-	if start != "" {
-		s, err := time.Parse(time.RFC3339, start)
+func (cmd *command) validate(tf *tempflag) error {
+	if tf.start != "" {
+		s, err := time.Parse(time.RFC3339, tf.start)
 		if err != nil {
 			return errors.New("start time is invalid")
 		}
@@ -93,8 +99,8 @@ func (cmd *command) validate(start, end string, measurement, regexpMeasurement [
 	} else {
 		cmd.startTime = math.MinInt64
 	}
-	if end != "" {
-		e, err := time.Parse(time.RFC3339, end)
+	if tf.end != "" {
+		e, err := time.Parse(time.RFC3339, tf.end)
 		if err != nil {
 			return errors.New("end time is invalid")
 		}
@@ -114,13 +120,13 @@ func (cmd *command) validate(start, end string, measurement, regexpMeasurement [
 	if len(cmd.measurement) > 0 && cmd.database == "" {
 		return errors.New("must specify a database when measurement given")
 	}
-	for _, str := range measurement {
+	for _, str := range tf.measurement {
 		cmd.measurement[str] = struct{}{}
 	}
 	if len(cmd.regexpMeasurement) > 0 && cmd.database == "" {
 		return errors.New("must specify a database when regexp measurement given")
 	}
-	for _, str := range regexpMeasurement {
+	for _, str := range tf.regexpMeasurement {
 		if rem, err := regexp.Compile(str); err == nil {
 			cmd.regexpMeasurement = append(cmd.regexpMeasurement, rem)
 		} else {
@@ -130,8 +136,8 @@ func (cmd *command) validate(start, end string, measurement, regexpMeasurement [
 	return nil
 }
 
-func (cmd *command) runE(start, end string, measurement, regexpMeasurement []string) error {
-	if err := cmd.validate(start, end, measurement, regexpMeasurement); err != nil {
+func (cmd *command) runE(tf *tempflag) error {
+	if err := cmd.validate(tf); err != nil {
 		return err
 	}
 	if err := cmd.walkTSMFiles(); err != nil {
