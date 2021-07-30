@@ -37,13 +37,11 @@ type command struct {
 	endTime           int64
 	compress          bool
 	lponly            bool
-}
 
-var (
-	manifest = make(map[string]struct{})
-	tsmFiles = make(map[string][]string)
-	walFiles = make(map[string][]string)
-)
+	manifest map[string]struct{}
+	tsmFiles map[string][]string
+	walFiles map[string][]string
+}
 
 const stdoutMark = "-"
 
@@ -53,6 +51,9 @@ func NewCommand() *cobra.Command {
 	cmd := &command{
 		measurement:       make(map[string]struct{}),
 		regexpMeasurement: make([]*regexp.Regexp, 0),
+		manifest:          make(map[string]struct{}),
+		tsmFiles:          make(map[string][]string),
+		walFiles:          make(map[string][]string),
 	}
 	cmd.cobraCmd = &cobra.Command{
 		Args:          cobra.NoArgs,
@@ -80,41 +81,6 @@ func NewCommand() *cobra.Command {
 	cmd.cobraCmd.MarkFlagRequired("datadir")
 	cmd.cobraCmd.MarkFlagRequired("waldir")
 	return cmd.cobraCmd
-}
-
-func (cmd *command) usingStdOut() bool {
-	return cmd.out == stdoutMark
-}
-
-func (cmd *command) matchMeasurement(m string) bool {
-	if len(cmd.measurement) == 0 && len(cmd.regexpMeasurement) == 0 {
-		return true
-	}
-	if len(cmd.measurement) > 0 {
-		if _, ok := cmd.measurement[m]; ok {
-			return true
-		}
-	}
-	if len(cmd.regexpMeasurement) > 0 {
-		for _, rem := range cmd.regexpMeasurement {
-			if rem.MatchString(m) {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func (cmd *command) withMeasurement() string {
-	if len(cmd.measurement) > 0 && len(cmd.regexpMeasurement) > 0 {
-		return fmt.Sprintf(" with %d measurements and %d regexp measurements", len(cmd.measurement), len(cmd.regexpMeasurement))
-	} else if len(cmd.measurement) > 0 {
-		return fmt.Sprintf(" with %d measurements", len(cmd.measurement))
-	} else if len(cmd.regexpMeasurement) > 0 {
-		return fmt.Sprintf(" with %d regexp measurements", len(cmd.regexpMeasurement))
-	} else {
-		return ""
-	}
 }
 
 func (cmd *command) validate(start, end string, measurement, regexpMeasurement []string) {
@@ -197,8 +163,8 @@ func (cmd *command) walkTSMFiles() error {
 		if dirs[0] != "_internal" && (dirs[0] == cmd.database || cmd.database == "") {
 			if dirs[1] == cmd.retentionPolicy || cmd.retentionPolicy == "" {
 				key := filepath.Join(dirs[0], dirs[1])
-				manifest[key] = struct{}{}
-				tsmFiles[key] = append(tsmFiles[key], path)
+				cmd.manifest[key] = struct{}{}
+				cmd.tsmFiles[key] = append(cmd.tsmFiles[key], path)
 			}
 		}
 		return nil
@@ -228,8 +194,8 @@ func (cmd *command) walkWALFiles() error {
 		if dirs[0] != "_internal" && (dirs[0] == cmd.database || cmd.database == "") {
 			if dirs[1] == cmd.retentionPolicy || cmd.retentionPolicy == "" {
 				key := filepath.Join(dirs[0], dirs[1])
-				manifest[key] = struct{}{}
-				walFiles[key] = append(walFiles[key], path)
+				cmd.manifest[key] = struct{}{}
+				cmd.walFiles[key] = append(cmd.walFiles[key], path)
 			}
 		}
 		return nil
@@ -239,7 +205,7 @@ func (cmd *command) walkWALFiles() error {
 func (cmd *command) writeDDL(mw io.Writer, w io.Writer) error {
 	// Write out all the DDL
 	fmt.Fprintln(mw, "# DDL")
-	for key := range manifest {
+	for key := range cmd.manifest {
 		keys := strings.Split(key, string(os.PathSeparator))
 		db, rp := influxql.QuoteIdent(keys[0]), influxql.QuoteIdent(keys[1])
 		fmt.Fprintf(w, "CREATE DATABASE %s WITH NAME %s\n", db, rp)
@@ -256,20 +222,20 @@ func (cmd *command) writeDML(mw io.Writer, w io.Writer) error {
 	} else {
 		msgOut = os.Stdout
 	}
-	for key := range manifest {
+	for key := range cmd.manifest {
 		keys := strings.Split(key, string(os.PathSeparator))
 		fmt.Fprintf(mw, "# CONTEXT-DATABASE:%s\n", keys[0])
 		fmt.Fprintf(mw, "# CONTEXT-RETENTION-POLICY:%s\n", keys[1])
-		if files, ok := tsmFiles[key]; ok {
+		if files, ok := cmd.tsmFiles[key]; ok {
 			fmt.Fprintf(msgOut, "writing out tsm file data for %s%s...", key, cmd.withMeasurement())
 			if err := cmd.writeTsmFiles(mw, w, files); err != nil {
 				return err
 			}
 			fmt.Fprintln(msgOut, "complete.")
 		}
-		if _, ok := walFiles[key]; ok {
+		if _, ok := cmd.walFiles[key]; ok {
 			fmt.Fprintf(msgOut, "writing out wal file data for %s%s...", key, cmd.withMeasurement())
-			if err := cmd.writeWALFiles(mw, w, walFiles[key], key); err != nil {
+			if err := cmd.writeWALFiles(mw, w, cmd.walFiles[key], key); err != nil {
 				return err
 			}
 			fmt.Fprintln(msgOut, "complete.")
@@ -527,4 +493,39 @@ func (cmd *command) writeValues(w io.Writer, seriesKey []byte, field string, val
 	}
 
 	return nil
+}
+
+func (cmd *command) usingStdOut() bool {
+	return cmd.out == stdoutMark
+}
+
+func (cmd *command) matchMeasurement(m string) bool {
+	if len(cmd.measurement) == 0 && len(cmd.regexpMeasurement) == 0 {
+		return true
+	}
+	if len(cmd.measurement) > 0 {
+		if _, ok := cmd.measurement[m]; ok {
+			return true
+		}
+	}
+	if len(cmd.regexpMeasurement) > 0 {
+		for _, rem := range cmd.regexpMeasurement {
+			if rem.MatchString(m) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (cmd *command) withMeasurement() string {
+	if len(cmd.measurement) > 0 && len(cmd.regexpMeasurement) > 0 {
+		return fmt.Sprintf(" with %d measurements and %d regexp measurements", len(cmd.measurement), len(cmd.regexpMeasurement))
+	} else if len(cmd.measurement) > 0 {
+		return fmt.Sprintf(" with %d measurements", len(cmd.measurement))
+	} else if len(cmd.regexpMeasurement) > 0 {
+		return fmt.Sprintf(" with %d regexp measurements", len(cmd.regexpMeasurement))
+	} else {
+		return ""
+	}
 }
