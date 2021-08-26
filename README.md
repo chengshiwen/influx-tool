@@ -168,17 +168,18 @@ They need to be transferred to a new InfluxDB cluster. Assuming that one circle 
 all data need to be transferred，and we can use 8 worker threads, so the following commands should be executed:
 
 ```bash
-./influx-tools transfer --source-dir /data/source-1/influxdb --target-dir /data/target/influxdb --database db --node-total 4 --worker 8
-./influx-tools transfer --source-dir /data/source-2/influxdb --target-dir /data/target/influxdb --database db --node-total 4 --worker 8
-./influx-tools transfer --source-dir /data/source-3/influxdb --target-dir /data/target/influxdb --database db --node-total 4 --worker 8
+./influx-tool transfer --source-dir /data/source-1/influxdb --target-dir /data/target/influxdb --database db --node-total 4 --worker 8
+./influx-tool transfer --source-dir /data/source-2/influxdb --target-dir /data/target/influxdb --database db --node-total 4 --worker 8
+./influx-tool transfer --source-dir /data/source-3/influxdb --target-dir /data/target/influxdb --database db --node-total 4 --worker 8
 
-./influx-tools compact --path /data/target/influxdb-0/data/db/autogen --force --worker 8
-./influx-tools compact --path /data/target/influxdb-1/data/db/autogen --force --worker 8
-./influx-tools compact --path /data/target/influxdb-2/data/db/autogen --force --worker 8
-./influx-tools compact --path /data/target/influxdb-3/data/db/autogen --force --worker 8
+./influx-tool compact --path /data/target/influxdb-0/data/db/autogen --force --worker 8
+./influx-tool compact --path /data/target/influxdb-1/data/db/autogen --force --worker 8
+./influx-tool compact --path /data/target/influxdb-2/data/db/autogen --force --worker 8
+./influx-tool compact --path /data/target/influxdb-3/data/db/autogen --force --worker 8
 ```
 
 The first 3 commands transfer the old 3 InfluxDB data to the `/data/target/influxdb` directory, and generate the following 4 new influxdb data directories,
+(the directory name is `{target-dir}-{serial number}`, where the range of `serial number` is `[0, {node-total})`, so there are `{node-total}` directories in total),
 the order of which is the same as the order of backends in new `proxy.json`:
 
 ```
