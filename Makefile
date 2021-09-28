@@ -1,11 +1,12 @@
 # Makefile
 
+PROGRAM     := influx-tool
 VERSION     := 0.3.0
 LDFLAGS     ?= "-s -w -X github.com/chengshiwen/influx-tool/cmd.Version=$(VERSION) -X github.com/chengshiwen/influx-tool/cmd.GitCommit=$(shell git rev-parse --short HEAD) -X 'github.com/chengshiwen/influx-tool/cmd.BuildTime=$(shell date '+%Y-%m-%d %H:%M:%S')'"
 GOBUILD_ENV = GO111MODULE=on CGO_ENABLED=0
-GOBUILD     = go build -o bin/influx-tool -a -ldflags $(LDFLAGS)
+GOBUILD     = go build -o bin/$(PROGRAM) -a -ldflags $(LDFLAGS)
 GOX         = go run github.com/mitchellh/gox
-TARGETS     := darwin/amd64 linux/amd64 windows/amd64
+TARGETS     := darwin/amd64 darwin/arm64 linux/amd64 windows/amd64
 DIST_DIRS   := find * -maxdepth 0 -type d -exec
 
 .PHONY: build linux cross-build release test lint down tidy clean
@@ -19,7 +20,7 @@ linux:
 	GOOS=linux GOARCH=amd64 $(GOBUILD_ENV) $(GOBUILD)
 
 cross-build: clean
-	$(GOBUILD_ENV) $(GOX) -ldflags $(LDFLAGS) -parallel=3 -output="bin/influx-tool-$(VERSION)-{{.OS}}-{{.Arch}}/influx-tool" -osarch='$(TARGETS)' .
+	$(GOBUILD_ENV) $(GOX) -ldflags $(LDFLAGS) -parallel=4 -output="bin/$(PROGRAM)-$(VERSION)-{{.OS}}-{{.Arch}}/$(PROGRAM)" -osarch='$(TARGETS)' .
 
 release: cross-build
 	( \
