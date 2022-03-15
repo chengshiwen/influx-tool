@@ -143,7 +143,8 @@ func (cmd *command) runE(tf *tempflag) error {
 		}
 	}()
 	for idx := range cmd.nodeIndex {
-		importServer, err := server.NewServer(fmt.Sprintf("%s-%d", cmd.targetDir, idx), !cmd.skipTsi)
+		dir := fmt.Sprintf("%s-%d", strings.TrimRight(cmd.targetDir, "/"), idx)
+		importServer, err := server.NewServer(dir, !cmd.skipTsi)
 		if err != nil {
 			return err
 		}
