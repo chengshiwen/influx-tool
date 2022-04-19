@@ -1,12 +1,11 @@
 # Influx Tool
 
+[![CN doc](https://img.shields.io/badge/文档-中文版-blue.svg)](https://github.com/chengshiwen/influx-tool/wiki)
+[![EN doc](https://img.shields.io/badge/document-English-blue.svg)](https://github.com/chengshiwen/influx-tool/blob/master/README.md)
 [![Go Report Card](https://goreportcard.com/badge/chengshiwen/influx-tool)](https://goreportcard.com/report/chengshiwen/influx-tool)
 [![LICENSE](https://img.shields.io/github/license/chengshiwen/influx-tool.svg)](https://github.com/chengshiwen/influx-tool/blob/master/LICENSE)
-[![Releases](https://img.shields.io/github/release-pre/chengshiwen/influx-tool.svg)](https://github.com/chengshiwen/influx-tool/releases)
+[![Releases](https://img.shields.io/github/v/release/chengshiwen/influx-tool.svg)](https://github.com/chengshiwen/influx-tool/releases)
 ![GitHub stars](https://img.shields.io/github/stars/chengshiwen/influx-tool.svg?label=github%20stars&logo=github)
-
-[![EN doc](https://img.shields.io/badge/document-English-blue.svg)](https://github.com/chengshiwen/influx-tool/blob/master/README.md)
-[![CN doc](https://img.shields.io/badge/文档-中文版-blue.svg)](https://github.com/chengshiwen/influx-tool/wiki)
 
 influx-tool - Influx Tool for [InfluxDB](https://docs.influxdata.com/influxdb/v1.8/) and [Influx Proxy](https://github.com/chengshiwen/influx-proxy)
 
