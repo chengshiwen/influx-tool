@@ -22,6 +22,7 @@ Usage:
 Available Commands:
   cleanup     Cleanup measurements with regexp
   compact     Compact the all shards fully
+  completion  Generate the autocompletion script for the specified shell
   export      Export tsm files into InfluxDB line protocol format
   help        Help about any command
   import      Import a previous export from file
