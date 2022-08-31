@@ -1,7 +1,7 @@
 # Makefile
 
 PROGRAM     := influx-tool
-VERSION     := 0.3.1
+VERSION     := 0.3.2
 LDFLAGS     ?= "-s -w -X github.com/chengshiwen/influx-tool/cmd.Version=$(VERSION) -X github.com/chengshiwen/influx-tool/cmd.GitCommit=$(shell git rev-parse --short HEAD) -X 'github.com/chengshiwen/influx-tool/cmd.BuildTime=$(shell date '+%Y-%m-%d %H:%M:%S')'"
 GOBUILD_ENV = GO111MODULE=on CGO_ENABLED=0
 GOBUILD     = go build -o bin/$(PROGRAM) -a -ldflags $(LDFLAGS)
