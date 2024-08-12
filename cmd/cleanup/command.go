@@ -152,7 +152,7 @@ func (cmd *command) dropMeasurements(c client.Client, measurements []string) {
 				end = len(measurements)
 			}
 			for _, measurement := range measurements[start:end] {
-				query := fmt.Sprintf("DROP MEASUREMENT \"%s\"", measurement)
+				query := fmt.Sprintf("DROP MEASUREMENT \"%s\"", escapeIdentifier(measurement))
 				queries = append(queries, query)
 			}
 			query := strings.Join(queries, "; ")
@@ -183,4 +183,8 @@ func (cmd *command) dropMeasurements(c client.Client, measurements []string) {
 		}
 		log.Print("cleanup measurements done")
 	}
+}
+
+func escapeIdentifier(in string) string {
+	return strings.ReplaceAll(in, `"`, `\"`)
 }
