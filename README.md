@@ -23,6 +23,7 @@ Available Commands:
   cleanup     Cleanup measurements with regexp
   compact     Compact the all shards fully
   completion  Generate the autocompletion script for the specified shell
+  deletetsm   Delete a measurement from a raw tsm file
   export      Export tsm files into InfluxDB line protocol format
   help        Help about any command
   import      Import a previous export from file
@@ -77,6 +78,23 @@ Flags:
   -f, --force         force compaction without prompting (default: false)
   -w, --worker int    number of concurrent workers to compact (default: 0, unlimited)
   -h, --help          help for compact
+```
+
+### Deletetsm
+
+```
+$ influx-tool deletetsm --help
+
+Delete a measurement from a raw tsm file
+
+Usage:
+  influx-tool deletetsm [flags] path...
+
+Flags:
+  -m, --measurement string   the name of the measurement to remove
+  -s, --sanitize             remove all keys with non-printable unicode characters (default: false)
+  -v, --verbose              enable verbose logging (default: false)
+  -h, --help                 help for deletetsm
 ```
 
 ### Export
