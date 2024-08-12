@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -59,7 +58,7 @@ func (cmd *command) runE() error {
 	if err := cmd.validate(); err != nil {
 		return err
 	}
-	files, err := ioutil.ReadDir(cmd.path)
+	files, err := os.ReadDir(cmd.path)
 	if err != nil {
 		return err
 	}
