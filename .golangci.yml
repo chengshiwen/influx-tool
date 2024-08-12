@@ -2,7 +2,11 @@ run:
   allow-parallel-runners: true
 linters:
   enable:
-    - golint
+    - revive
   disable:
     - errcheck
-    - typecheck
+linters-settings:
+  revive:
+    rules:
+      - name: unused-parameter
+        disabled: true
