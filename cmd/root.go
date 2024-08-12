@@ -9,6 +9,7 @@ import (
 
 	"github.com/chengshiwen/influx-tool/cmd/cleanup"
 	"github.com/chengshiwen/influx-tool/cmd/compact"
+	"github.com/chengshiwen/influx-tool/cmd/deletetsm"
 	exporter "github.com/chengshiwen/influx-tool/cmd/export"
 	importer "github.com/chengshiwen/influx-tool/cmd/import"
 	"github.com/chengshiwen/influx-tool/cmd/transfer"
@@ -45,6 +46,7 @@ func NewCommand() *cobra.Command {
 	cmd.SetVersionTemplate(`{{.Version}}`)
 	cmd.AddCommand(cleanup.NewCommand())
 	cmd.AddCommand(compact.NewCommand())
+	cmd.AddCommand(deletetsm.NewCommand())
 	cmd.AddCommand(exporter.NewCommand())
 	cmd.AddCommand(importer.NewCommand())
 	cmd.AddCommand(transfer.NewCommand())
