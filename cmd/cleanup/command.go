@@ -8,8 +8,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	_ "github.com/influxdata/influxdb1-client" // this is important because of the bug in go mod
-	client "github.com/influxdata/influxdb1-client/v2"
+	"github.com/influxdata/influxdb/client/v2"
 	"github.com/spf13/cobra"
 )
 
@@ -125,11 +124,11 @@ func (cmd *command) runE() error {
 		}
 	}
 	if len(measurements) > cmd.showNum {
-		log.Printf("measurements: %v ... (total %d)", strings.Join(measurements[:cmd.showNum], " "), len(measurements))
+		log.Printf("measurements: %d total, the first %d shown as follow: \n%s", len(measurements), cmd.showNum, strings.Join(measurements[:cmd.showNum], "\n"))
 	} else if len(measurements) > 0 {
-		log.Printf("measurements: %v (total %d)", strings.Join(measurements, " "), len(measurements))
+		log.Printf("measurements: %d total, all shown as follow: \n%s", len(measurements), strings.Join(measurements, "\n"))
 	} else {
-		log.Print("measurements: empty (total 0)")
+		log.Print("measurements: 0 total, empty")
 		return nil
 	}
 
@@ -139,6 +138,7 @@ func (cmd *command) runE() error {
 
 func (cmd *command) dropMeasurements(c client.Client, measurements []string) {
 	if cmd.cleanup {
+		log.Print("")
 		log.Print("cleanup measurements ...")
 		limit := make(chan struct{}, cmd.worker)
 		wg := &sync.WaitGroup{}
