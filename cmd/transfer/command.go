@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/chengshiwen/influx-tool/internal/binary"
+	"github.com/chengshiwen/influx-tool/internal/hash"
 	"github.com/chengshiwen/influx-tool/internal/server"
 	"github.com/djherbis/nio/v3"
 	"github.com/spf13/cobra"
@@ -66,7 +67,7 @@ func NewCommand() *cobra.Command {
 	flags.BoolVar(&cmd.skipTsi, "skip-tsi", false, "skip building TSI index on disk (default: false)")
 	flags.IntVarP(&cmd.nodeTotal, "node-total", "n", 1, "total number of node in target circle")
 	flags.VarP(&cmd.nodeIndex, "node-index", "i", "index of node in target circle delimited by comma, [0, node-total) (default: all)")
-	flags.StringVarP(&cmd.hashKey, "hash-key", "k", "idx", "hash key for influx proxy, valid options are idx or exi")
+	flags.StringVarP(&cmd.hashKey, "hash-key", "k", "idx", "hash key for influx proxy: idx, exi or template containing %idx")
 	cmd.cobraCmd.MarkFlagRequired("source-dir")
 	cmd.cobraCmd.MarkFlagRequired("target-dir")
 	cmd.cobraCmd.MarkFlagRequired("database")
@@ -112,8 +113,8 @@ func (cmd *command) validate(tf *tempflag) error {
 			cmd.nodeIndex[idx] = struct{}{}
 		}
 	}
-	if cmd.hashKey != "idx" && cmd.hashKey != "exi" {
-		return errors.New("hash-key is invalid")
+	if cmd.hashKey != hash.HashKeyIdx && cmd.hashKey != hash.HashKeyExi && !strings.Contains(cmd.hashKey, hash.HashKeyVarIdx) {
+		return errors.New("hash-key is invalid, require idx, exi or template containing %idx")
 	}
 	return nil
 }

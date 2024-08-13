@@ -167,7 +167,7 @@ Flags:
       --skip-tsi                  skip building TSI index on disk (default: false)
   -n, --node-total int            total number of node in target circle (default 1)
   -i, --node-index intset         index of node in target circle delimited by comma, [0, node-total) (default: all)
-  -k, --hash-key string           hash key for influx proxy, valid options are idx or exi (default "idx")
+  -k, --hash-key string           hash key for influx proxy: idx, exi or template containing %idx (default "idx")
   -h, --help                      help for transfer
 ```
 

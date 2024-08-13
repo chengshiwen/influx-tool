@@ -8,28 +8,43 @@ import (
 	"stathat.com/c/consistent"
 )
 
+var (
+	HashKeyIdx    = "idx"
+	HashKeyExi    = "exi"
+	HashKeyVarIdx = "%idx"
+)
+
 type Hash interface {
 	Get(key string) int
 }
 
 type ConsistentHash struct {
 	consistent *consistent.Consistent
+	mapToIdx   map[string]int
 	cache      sync.Map
 }
 
 func NewConsistentHash(nodeTotal int, hashKey string) *ConsistentHash {
 	ch := &ConsistentHash{
 		consistent: consistent.New(),
+		mapToIdx:   make(map[string]int),
 	}
 	ch.consistent.NumberOfReplicas = 256
 	for idx := 0; idx < nodeTotal; idx++ {
-		str := strconv.Itoa(idx)
-		if hashKey == "exi" {
+		var key string
+		switch hashKey {
+		case HashKeyExi:
 			// exi: extended index, no hash collision will occur before idx <= 100000, which has been tested
-			// idx: default index, each additional backend causes 10% hash collision from 11th backend
-			str = "|" + str
+			key = "|" + strconv.Itoa(idx)
+		case HashKeyIdx:
+			// idx: index, each additional backend causes 10% hash collision from 11th backend
+			key = strconv.Itoa(idx)
+		default:
+			// %idx: custom template like "backend-%idx"
+			key = strings.ReplaceAll(hashKey, HashKeyVarIdx, strconv.Itoa(idx))
 		}
-		ch.consistent.Add(str)
+		ch.consistent.Add(key)
+		ch.mapToIdx[key] = idx
 	}
 	return ch
 }
@@ -39,7 +54,7 @@ func (ch *ConsistentHash) Get(key string) int {
 		return idx.(int)
 	}
 	str, _ := ch.consistent.Get(key)
-	idx, _ := strconv.Atoi(str)
+	idx := ch.mapToIdx[str]
 	ch.cache.Store(key, idx)
 	return idx
 }
