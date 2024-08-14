@@ -72,10 +72,11 @@ func newExporter(svr *server.Server, db, rp string, sd time.Duration, start, end
 func (e *exporter) SourceShardGroups() []meta.ShardGroupInfo { return e.sourceGroups }
 func (e *exporter) TargetShardGroups() []meta.ShardGroupInfo { return e.targetGroups }
 
-func (e *exporter) WriteTo(prChans map[int]chan *nio.PipeReader, nodeTotal int, hashKey string, worker int) {
+func (e *exporter) WriteTo(prChans map[int]chan *nio.PipeReader, nodeTotal int, hashKey string, shardKey string, worker int) {
 	log.Printf("total shard groups: %d", len(e.targetGroups))
 	limit := make(chan struct{}, worker)
 	ch := hash.NewConsistentHash(nodeTotal, hashKey)
+	st := hash.NewShardTpl(shardKey)
 	wg := &sync.WaitGroup{}
 	for _, g := range e.targetGroups {
 		g := g
@@ -110,7 +111,7 @@ func (e *exporter) WriteTo(prChans map[int]chan *nio.PipeReader, nodeTotal int, 
 			}
 			defer rs.Close()
 
-			err = e.writeBucket(prChans, rs, min, max, ch)
+			err = e.writeBucket(prChans, rs, min, max, ch, st)
 			if err != nil {
 				log.Printf("export worker write error: %s, shard group: %d, min: %d, max: %d", err, g.ID, min.Unix(), max.Unix())
 			}
@@ -121,7 +122,7 @@ func (e *exporter) WriteTo(prChans map[int]chan *nio.PipeReader, nodeTotal int, 
 	log.Print("all shard groups done")
 }
 
-func (e *exporter) writeBucket(prChans map[int]chan *nio.PipeReader, rs *storage.ResultSet, min, max time.Time, h hash.Hash) error {
+func (e *exporter) writeBucket(prChans map[int]chan *nio.PipeReader, rs *storage.ResultSet, min, max time.Time, h hash.Hash, s hash.Shard) error {
 	pws := make(map[int]*nio.PipeWriter)
 	wrs := make(map[int]*binary.Writer)
 	bws := make(map[int]*binary.BucketWriter)
@@ -142,7 +143,7 @@ func (e *exporter) writeBucket(prChans map[int]chan *nio.PipeReader, rs *storage
 			log.Printf("discard escaped measurement: %s, tags: %s", rs.Name(), rs.Tags())
 			continue
 		}
-		nodeIndex := h.Get(hash.GetKey(e.db, rs.Name()))
+		nodeIndex := h.Get(s.GetKey(e.db, rs.Name()))
 		if prChan, pok := prChans[nodeIndex]; pok {
 			if _, bok := bws[nodeIndex]; !bok {
 				buf := buffer.New(int64(4 * 1024 * 1024))

@@ -33,6 +33,7 @@ type command struct {
 	nodeTotal       int
 	nodeIndex       intSet
 	hashKey         string
+	shardKey        string
 }
 
 type tempflag struct {
@@ -68,6 +69,7 @@ func NewCommand() *cobra.Command {
 	flags.IntVarP(&cmd.nodeTotal, "node-total", "n", 1, "total number of node in target circle")
 	flags.VarP(&cmd.nodeIndex, "node-index", "i", "index of node in target circle delimited by comma, [0, node-total) (default: all)")
 	flags.StringVarP(&cmd.hashKey, "hash-key", "k", "idx", "hash key for influx proxy: idx, exi or template containing %idx")
+	flags.StringVarP(&cmd.shardKey, "shard-key", "K", "%db,%mm", "shard key for influx proxy, which containing %db or %mm")
 	cmd.cobraCmd.MarkFlagRequired("source-dir")
 	cmd.cobraCmd.MarkFlagRequired("target-dir")
 	cmd.cobraCmd.MarkFlagRequired("database")
@@ -115,6 +117,9 @@ func (cmd *command) validate(tf *tempflag) error {
 	}
 	if cmd.hashKey != hash.HashKeyIdx && cmd.hashKey != hash.HashKeyExi && !strings.Contains(cmd.hashKey, hash.HashKeyVarIdx) {
 		return errors.New("hash-key is invalid, require idx, exi or template containing %idx")
+	}
+	if !strings.Contains(cmd.shardKey, hash.ShardKeyVarDb) && !strings.Contains(cmd.shardKey, hash.ShardKeyVarMm) {
+		return errors.New("shard-key is invalid, require template containing %db or %mm")
 	}
 	return nil
 }
@@ -185,7 +190,7 @@ func (cmd *command) transfer(exp *exporter, imps map[int]*importer) {
 				close(prChan)
 			}
 		}()
-		exp.WriteTo(prChans, cmd.nodeTotal, cmd.hashKey, cmd.worker)
+		exp.WriteTo(prChans, cmd.nodeTotal, cmd.hashKey, cmd.shardKey, cmd.worker)
 	}()
 
 	wg := &sync.WaitGroup{}

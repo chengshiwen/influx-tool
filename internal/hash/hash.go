@@ -12,6 +12,8 @@ var (
 	HashKeyIdx    = "idx"
 	HashKeyExi    = "exi"
 	HashKeyVarIdx = "%idx"
+	ShardKeyVarDb = "%db"
+	ShardKeyVarMm = "%mm"
 )
 
 type Hash interface {
@@ -59,11 +61,56 @@ func (ch *ConsistentHash) Get(key string) int {
 	return idx
 }
 
-func GetKey(db string, meas []byte) string {
+type Shard interface {
+	GetKey(db string, mm []byte) string
+}
+
+type ShardTpl struct {
+	tpl   string
+	parts []string
+	dbCnt int
+	mmCnt int
+}
+
+func NewShardTpl(tpl string) *ShardTpl {
+	st := &ShardTpl{tpl: tpl}
+	for i := 0; i < len(tpl); {
+		for j := i; j < len(tpl); {
+			if j <= len(tpl)-3 && (tpl[j:j+3] == ShardKeyVarDb || tpl[j:j+3] == ShardKeyVarMm) {
+				if j > i {
+					st.parts = append(st.parts, tpl[i:j])
+				}
+				st.parts = append(st.parts, tpl[j:j+3])
+				if tpl[j:j+3] == ShardKeyVarDb {
+					st.dbCnt++
+				} else if tpl[j:j+3] == ShardKeyVarMm {
+					st.mmCnt++
+				}
+				i, j = j+3, j+3
+				continue
+			}
+			j++
+			if j == len(tpl) {
+				st.parts = append(st.parts, tpl[i:j])
+				i = j
+				break
+			}
+		}
+	}
+	return st
+}
+
+func (st *ShardTpl) GetKey(db string, mm []byte) string {
 	var b strings.Builder
-	b.Grow(len(db) + len(meas) + 1)
-	b.WriteString(db)
-	b.WriteString(",")
-	b.Write(meas)
+	b.Grow(len(st.tpl) + (len(db)-len(ShardKeyVarDb))*st.dbCnt + (len(mm)-len(ShardKeyVarMm))*st.mmCnt)
+	for _, part := range st.parts {
+		if part == ShardKeyVarDb {
+			b.WriteString(db)
+		} else if part == ShardKeyVarMm {
+			b.Write(mm)
+		} else {
+			b.WriteString(part)
+		}
+	}
 	return b.String()
 }
