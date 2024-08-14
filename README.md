@@ -25,6 +25,7 @@ Available Commands:
   completion  Generate the autocompletion script for the specified shell
   deletetsm   Delete a measurement from a raw tsm file
   export      Export tsm files into InfluxDB line protocol format
+  hashdist    Hash distribution calculation
   help        Help about any command
   import      Import a previous export from file
   transfer    Transfer influxdb persist data on disk from one to another
@@ -120,6 +121,28 @@ Flags:
   -l, --lponly                           only export line protocol (default: false)
   -c, --compress                         compress the output (default: false)
   -h, --help                             help for export
+```
+
+### Hashdist
+
+```
+$ influx-tool hashdist --help
+
+Hash distribution calculation
+
+Usage:
+  influx-tool hashdist [flags]
+
+Flags:
+  -n, --node-total int       total number of node in a circle (default 1)
+  -k, --hash-key string      hash key for influx proxy: idx, exi or template containing %idx (default "idx")
+  -K, --shard-key string     shard key for influx proxy, which containing %db or %mm (default "%db,%mm")
+  -d, --database string      database name, note that --file cannot be specified when --database specified
+  -m, --measurement string   measurement name, note that --file cannot be specified when --measurement specified
+  -s, --separator string     separator character to separate each line in the file (default ",")
+  -f, --file string          path to the file to read, format of each line is like 'db,mm' separated by a separator
+  -D, --dist string          '-' for standard out or the distribution file to write to when --file specified (default "./dist")
+  -h, --help                 help for hashdist
 ```
 
 ### Import
