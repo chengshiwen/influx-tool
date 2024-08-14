@@ -11,6 +11,7 @@ import (
 	"github.com/chengshiwen/influx-tool/cmd/compact"
 	"github.com/chengshiwen/influx-tool/cmd/deletetsm"
 	exporter "github.com/chengshiwen/influx-tool/cmd/export"
+	"github.com/chengshiwen/influx-tool/cmd/hashdist"
 	importer "github.com/chengshiwen/influx-tool/cmd/import"
 	"github.com/chengshiwen/influx-tool/cmd/transfer"
 	"github.com/spf13/cobra"
@@ -48,6 +49,7 @@ func NewCommand() *cobra.Command {
 	cmd.AddCommand(compact.NewCommand())
 	cmd.AddCommand(deletetsm.NewCommand())
 	cmd.AddCommand(exporter.NewCommand())
+	cmd.AddCommand(hashdist.NewCommand())
 	cmd.AddCommand(importer.NewCommand())
 	cmd.AddCommand(transfer.NewCommand())
 	return cmd
