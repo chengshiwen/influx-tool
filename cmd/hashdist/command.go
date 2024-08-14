@@ -20,6 +20,7 @@ type command struct {
 	shardKey    string
 	database    string
 	measurement string
+	separator   string
 	file        string
 	dist        string
 }
@@ -45,7 +46,8 @@ func NewCommand() *cobra.Command {
 	flags.StringVarP(&cmd.shardKey, "shard-key", "K", "%db,%mm", "shard key for influx proxy, which containing %db or %mm")
 	flags.StringVarP(&cmd.database, "database", "d", "", "database name, note that --file cannot be specified when --database specified")
 	flags.StringVarP(&cmd.measurement, "measurement", "m", "", "measurement name, note that --file cannot be specified when --measurement specified")
-	flags.StringVarP(&cmd.file, "file", "f", "", "path to the file to read, format of each line is 'db,mm' separated by a comma")
+	flags.StringVarP(&cmd.separator, "separator", "s", ",", "separator character to separate each line in the file")
+	flags.StringVarP(&cmd.file, "file", "f", "", "path to the file to read, format of each line is like 'db,mm' separated by a separator")
 	flags.StringVarP(&cmd.dist, "dist", "D", "./dist", "'-' for standard out or the distribution file to write to when --file specified")
 	return cmd.cobraCmd
 }
@@ -73,6 +75,12 @@ func (cmd *command) validate() error {
 		}
 		if info.IsDir() {
 			return fmt.Errorf("file '%s' is a directory", cmd.file)
+		}
+		if cmd.separator == "" {
+			return errors.New("--separator flag required")
+		}
+		if cmd.dist == "" {
+			return errors.New("--dist flag required")
 		}
 	}
 	return nil
@@ -122,10 +130,10 @@ func (cmd *command) hashdist() error {
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		line := scanner.Text()
-		db, mm, ok := strings.Cut(line, ",")
+		db, mm, ok := strings.Cut(line, cmd.separator)
 		if !ok {
 			warn += 1
-			if _, err := w.Write([]byte(fmt.Sprintf("warning: '%s' ignored since comma not found\n", line))); err != nil {
+			if _, err := w.Write([]byte(fmt.Sprintf("warning: '%s' ignored since separator '%s' not found\n", line, cmd.separator))); err != nil {
 				return err
 			}
 			continue
