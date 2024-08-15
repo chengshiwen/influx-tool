@@ -9,11 +9,15 @@ import (
 )
 
 var (
-	HashKeyIdx    = "idx"
-	HashKeyExi    = "exi"
-	HashKeyVarIdx = "%idx"
-	ShardKeyVarDb = "%db"
-	ShardKeyVarMm = "%mm"
+	HashKeyIdx      = "idx"
+	HashKeyExi      = "exi"
+	HashKeyVarIdx   = "%idx"
+	ShardKeyVarOrg  = "%org"
+	ShardKeyVarBk   = "%bk"
+	ShardKeyVarDb   = "%db"
+	ShardKeyVarMm   = "%mm"
+	ShardKeyOrgBkMm = "%org,%bk,%mm"
+	ShardKeyDbMm    = "%db,%mm"
 )
 
 type Hash interface {
@@ -68,25 +72,33 @@ type Shard interface {
 type ShardTpl struct {
 	tpl   string
 	parts []string
-	dbCnt int
-	mmCnt int
+	freq  map[string]int
 }
 
+var ShardKeyVar = []string{ShardKeyVarOrg, ShardKeyVarBk, ShardKeyVarDb, ShardKeyVarMm}
+
 func NewShardTpl(tpl string) *ShardTpl {
-	st := &ShardTpl{tpl: tpl}
+	st := &ShardTpl{tpl: tpl, freq: make(map[string]int)}
+	for _, v := range ShardKeyVar {
+		st.freq[v] = 0
+	}
 	for i := 0; i < len(tpl); {
 		for j := i; j < len(tpl); {
-			if j <= len(tpl)-3 && (tpl[j:j+3] == ShardKeyVarDb || tpl[j:j+3] == ShardKeyVarMm) {
-				if j > i {
-					st.parts = append(st.parts, tpl[i:j])
+			found := false
+			for _, v := range ShardKeyVar {
+				n := len(v)
+				if j <= len(tpl)-n && tpl[j:j+n] == v {
+					if j > i {
+						st.parts = append(st.parts, tpl[i:j])
+					}
+					st.parts = append(st.parts, tpl[j:j+n])
+					st.freq[tpl[j:j+n]]++
+					i, j = j+n, j+n
+					found = true
+					break
 				}
-				st.parts = append(st.parts, tpl[j:j+3])
-				if tpl[j:j+3] == ShardKeyVarDb {
-					st.dbCnt++
-				} else if tpl[j:j+3] == ShardKeyVarMm {
-					st.mmCnt++
-				}
-				i, j = j+3, j+3
+			}
+			if found {
 				continue
 			}
 			j++
@@ -102,7 +114,7 @@ func NewShardTpl(tpl string) *ShardTpl {
 
 func (st *ShardTpl) GetKey(db string, mm []byte) string {
 	var b strings.Builder
-	b.Grow(len(st.tpl) + (len(db)-len(ShardKeyVarDb))*st.dbCnt + (len(mm)-len(ShardKeyVarMm))*st.mmCnt)
+	b.Grow(len(st.tpl) + st.varDiffLen(db, ShardKeyVarDb) + st.varByteDiffLen(mm, ShardKeyVarMm))
 	for _, part := range st.parts {
 		if part == ShardKeyVarDb {
 			b.WriteString(db)
@@ -113,4 +125,29 @@ func (st *ShardTpl) GetKey(db string, mm []byte) string {
 		}
 	}
 	return b.String()
+}
+
+func (st *ShardTpl) GetKeyV2(org, bk, mm string) string {
+	var b strings.Builder
+	b.Grow(len(st.tpl) + st.varDiffLen(org, ShardKeyVarOrg) + st.varDiffLen(bk, ShardKeyVarBk) + st.varDiffLen(mm, ShardKeyVarMm))
+	for _, part := range st.parts {
+		if part == ShardKeyVarOrg {
+			b.WriteString(org)
+		} else if part == ShardKeyVarBk {
+			b.WriteString(bk)
+		} else if part == ShardKeyVarMm {
+			b.WriteString(mm)
+		} else {
+			b.WriteString(part)
+		}
+	}
+	return b.String()
+}
+
+func (st *ShardTpl) varDiffLen(r string, v string) int {
+	return (len(r) - len(v)) * st.freq[v]
+}
+
+func (st *ShardTpl) varByteDiffLen(r []byte, v string) int {
+	return (len(r) - len(v)) * st.freq[v]
 }

@@ -134,10 +134,13 @@ Usage:
   influx-tool hashdist [flags]
 
 Flags:
+  -v, --version string       influxdb version: v1, v2 (default "v1")
   -n, --node-total int       total number of node in a circle (default 1)
-  -k, --hash-key string      hash key for influx proxy: idx, exi or template containing %idx (default "idx")
-  -K, --shard-key string     shard key for influx proxy, which containing %db or %mm (default "%db,%mm")
-  -d, --database string      database name, note that --file cannot be specified when --database specified
+  -k, --hash-key string      hash key for influx proxy: idx, exi or template containing %idx (v1 default "idx", v2 default "%idx")
+  -K, --shard-key string     shard key for influx proxy, which containing %org, %bk, %db or %mm (v1 default "%db,%mm", v2 default "%org,%bk,%mm")
+  -o, --org string           org name under influxdb v2, note that --file cannot be specified when --org specified
+  -b, --bucket string        bucket name under influxdb v2, note that --file cannot be specified when --bucket specified
+  -d, --database string      database name under influxdb v1, note that --file cannot be specified when --database specified
   -m, --measurement string   measurement name, note that --file cannot be specified when --measurement specified
   -s, --separator string     separator character to separate each line in the file (default ",")
   -f, --file string          path to the file to read, format of each line is like 'db,mm' separated by a separator
